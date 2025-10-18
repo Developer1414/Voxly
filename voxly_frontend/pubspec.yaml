@@ -1,6 +1,6 @@
 name: voxly_frontend
 description: "A new Flutter project."
-publish_to: 'none'
+publish_to: "none"
 version: 0.1.0
 
 environment:
@@ -11,6 +11,11 @@ dependencies:
     sdk: flutter
   http: ^1.5.0
   livekit_client: ^2.5.2
+  teledart: ^0.6.1
+  telegram_web_app: ^0.3.3
+  google_fonts: ^6.3.2
+  provider: ^6.1.5+1
+  vector_math: ^2.2.0
 
 dev_dependencies:
   flutter_test:

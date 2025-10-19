@@ -16,13 +16,17 @@ class LobbyPage extends StatelessWidget {
         ? Scaffold(
             body: Center(
               child: Column(
+                spacing: 20.0,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   ButtonWidget(
-                    onTap: () async => await livekitProvider.joinOrCreateRoom(
-                      roomName: 'room-${DateTime.now().microsecondsSinceEpoch}',
-                    ),
+                    onTap: () => livekitProvider.findMatch(),
                     label: 'Start Call',
+                    isLoading: livekitProvider.isLoading,
+                  ),
+                  ButtonWidget(
+                    onTap: () => livekitProvider.disconnectFromWebsocket(),
+                    label: 'Disconnect websocket',
                     isLoading: livekitProvider.isLoading,
                   ),
                 ],
@@ -40,10 +44,13 @@ class LobbyPage extends StatelessWidget {
                     style: AppTextStyles.buttonTextTheme,
                   ),
                   ButtonWidget(
-                    onTap: () async => await livekitProvider.joinOrCreateRoom(
-                      roomName: 'room-${DateTime.now().microsecondsSinceEpoch}',
-                    ),
+                    onTap: () async => await livekitProvider.endCall(),
                     label: 'End Call',
+                    isLoading: livekitProvider.isLoading,
+                  ),
+                  ButtonWidget(
+                    onTap: () => livekitProvider.disconnectFromWebsocket(),
+                    label: 'Disconnect websocket',
                     isLoading: livekitProvider.isLoading,
                   ),
                 ],

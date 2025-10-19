@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:livekit_client/livekit_client.dart';
 import 'package:voxly_frontend/core/services/telegram_service.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 class LivekitService extends ChangeNotifier {
   static final internal = LivekitService();
@@ -10,53 +10,122 @@ class LivekitService extends ChangeNotifier {
 
   final room = Room();
 
+  late IO.Socket socket;
+
   bool isLoading = false;
+  bool _connected = false;
+
+  bool get isConnected => _connected;
 
   void setLoadingState(bool state) {
     isLoading = state;
     notifyListeners();
   }
 
-  Future joinOrCreateRoom({required String roomName}) async {
-    try {
-      setLoadingState(true);
+  Future connectToWebsocket() async {
+    if (_connected) return;
 
-      final resp = await http.post(
-        Uri.parse('http://localhost:3000/getToken'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'roomName': roomName,
-          'userName':
-              TelegramService.instance.initData.user.username ?? 'noname',
-        }),
+    try {
+      socket = IO.io(
+        'http://localhost:3000',
+        IO.OptionBuilder()
+            .setTransports(['websocket'])
+            .enableAutoConnect()
+            .build(),
       );
 
-      final data = jsonDecode(resp.body);
-      final token = data['token'];
-      final url = data['liveKitUrl'];
+      socket.onConnect((_) {
+        _connected = true;
 
-      final roomOptions = RoomOptions(adaptiveStream: true, dynacast: true);
+        setLoadingState(false);
 
-      await room.prepareConnection(url, token);
+        print('Socket.IO connected');
+      });
 
-      await room.connect(url, token, roomOptions: roomOptions);
+      socket.onDisconnect((_) {
+        _connected = false;
 
-      await room.localParticipant?.setMicrophoneEnabled(true);
+        print('Socket.IO disconnected, will try reconnect');
+      });
 
-      setLoadingState(false);
-    } catch (error) {
-      setLoadingState(false);
+      socket.onConnectError((err) {
+        _connected = false;
 
-      if (kDebugMode) {
-        print('Error: $error');
-      }
+        setLoadingState(true);
+
+        print('Socket.IO connection error: $err');
+      });
+
+      socket.on('waiting', (_) {
+        print('Ожидание собеседника...');
+      });
+
+      socket.on('match', (data) async {
+        final d = data is String ? jsonDecode(data) : data;
+        await _connectRoom(d['liveKitUrl'], d['token']);
+      });
+
+      socket.on('ended', (_) async {
+        await room.disconnect();
+        notifyListeners();
+      });
+
+      socket.connect();
+    } catch (e) {
+      _connected = false;
+
+      setLoadingState(true);
+
+      print('Failed to connect: $e');
+
+      await Future.delayed(Duration(seconds: 3));
+
+      reconnectToWebsocket();
     }
+  }
+
+  void reconnectToWebsocket() {
+    if (!_connected) connectToWebsocket();
+  }
+
+  @override
+  void dispose() {
+    disconnectFromWebsocket();
+    super.dispose();
+  }
+
+  void disconnectFromWebsocket() {
+    setLoadingState(true);
+
+    _connected = false;
+
+    socket.disconnect();
+
+    print('disconnected');
+
+    setLoadingState(false);
+  }
+
+  void findMatch() {
+    setLoadingState(true);
+
+    final name = TelegramService.instance.initData.user.username ?? 'noname';
+
+    socket.emit('find', {'userName': name});
+  }
+
+  Future _connectRoom(String url, String token) async {
+    await room.connect(url, token);
+    await room.localParticipant?.setMicrophoneEnabled(true);
+
+    setLoadingState(false);
   }
 
   Future endCall() async {
     setLoadingState(true);
 
-    await room.localParticipant?.setMicrophoneEnabled(false);
+    socket.emit('end');
+
     await room.disconnect();
 
     setLoadingState(false);

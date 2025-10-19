@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:voxly_frontend/app.dart';
+import 'package:voxly_frontend/core/services/livekit_service.dart';
 import 'package:voxly_frontend/core/services/telegram_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await TelegramService.instance.init();
+
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    await LivekitService.instance.connectToWebsocket();
+  });
 
   runApp(MyApp());
 }

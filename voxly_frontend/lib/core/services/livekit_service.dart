@@ -57,7 +57,8 @@ class LivekitService extends ChangeNotifier {
 
     try {
       socket = IO.io(
-        'http://localhost:3000', // Укажите ваш IP-адрес, если запускаете на реальном устройстве
+        'https://voxly-backend.onrender.com',
+        //'http://localhost:3000', // Укажите ваш IP-адрес, если запускаете на реальном устройстве
         IO.OptionBuilder()
             .setTransports(['websocket'])
             .disableAutoConnect() // Управляем подключением вручную

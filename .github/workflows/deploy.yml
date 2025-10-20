@@ -28,7 +28,7 @@ jobs:
 
       - name: 4. Сборка Flutter Web
         run: |
-            flutter build web --release --base-href /voxly_frontend/
+            flutter build web --release --base-href /Voxly/
         working-directory: ./voxly_frontend
           
       - name: 5. Развертывание на GitHub Pages

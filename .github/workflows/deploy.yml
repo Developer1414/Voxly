@@ -1,0 +1,38 @@
+name: Flutter Web CI/CD
+
+# Запуск рабочего процесса при пуше в ветку main
+on:
+  push:
+    branches:
+      - main
+  # Также позволяет запускать вручную из вкладки Actions
+  workflow_dispatch:
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Необходимо для peaceiris/actions-gh-pages
+
+    steps:
+      - name: 1. Проверка кода (Checkout)
+        uses: actions/checkout@v4
+
+      - name: 2. Настройка Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable' # Можно использовать 'beta' или 'master'
+
+      - name: 3. Получение зависимостей
+        run: flutter pub get
+
+      - name: 4. Сборка Flutter Web
+        run: |
+          flutter build web --release --base-href /voxly-frontend/
+          
+      - name: 5. Развертывание на GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./build/web
+          publish_branch: gh-pages

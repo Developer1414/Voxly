@@ -1,18 +1,17 @@
 name: Flutter Web CI/CD
 
-# Запуск рабочего процесса при пуше в ветку main
 on:
   push:
     branches:
       - main
-  # Также позволяет запускать вручную из вкладки Actions
+
   workflow_dispatch:
 
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Необходимо для peaceiris/actions-gh-pages
+      contents: write
 
     steps:
       - name: 1. Проверка кода (Checkout)
@@ -21,7 +20,7 @@ jobs:
       - name: 2. Настройка Flutter SDK
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable' # Можно использовать 'beta' или 'master'
+          channel: 'stable'
 
       - name: 3. Получение зависимостей
         run: flutter pub get

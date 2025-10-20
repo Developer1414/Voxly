@@ -20,7 +20,7 @@ jobs:
       - name: 2. Настройка Flutter SDK
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: 'beta'
 
       - name: 3. Получение зависимостей
         run: flutter pub get

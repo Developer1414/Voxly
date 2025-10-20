@@ -22,12 +22,12 @@ class LobbyPage extends StatelessWidget {
                   ButtonWidget(
                     onTap: () => livekitProvider.findMatch(),
                     label: 'Start Call',
-                    isLoading: livekitProvider.isLoading,
+                    //isLoading: livekitProvider.isLoading,
                   ),
                   ButtonWidget(
-                    onTap: () => livekitProvider.disconnectFromWebsocket(),
+                    onTap: () => livekitProvider.dispose(),
                     label: 'Disconnect websocket',
-                    isLoading: livekitProvider.isLoading,
+                    //isLoading: livekitProvider.isLoading,
                   ),
                 ],
               ),
@@ -46,12 +46,12 @@ class LobbyPage extends StatelessWidget {
                   ButtonWidget(
                     onTap: () async => await livekitProvider.endCall(),
                     label: 'End Call',
-                    isLoading: livekitProvider.isLoading,
+                    //isLoading: livekitProvider.isLoading,
                   ),
                   ButtonWidget(
-                    onTap: () => livekitProvider.disconnectFromWebsocket(),
+                    onTap: () async => await livekitProvider.endCall(),
                     label: 'Disconnect websocket',
-                    isLoading: livekitProvider.isLoading,
+                    //isLoading: livekitProvider.isLoading,
                   ),
                 ],
               ),

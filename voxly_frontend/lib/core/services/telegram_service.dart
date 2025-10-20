@@ -9,6 +9,10 @@ class TelegramService {
 
   late final TelegramInitData initData;
 
+  String getUsername() {
+    return initData.user.username ?? initData.user.id.toString();
+  }
+
   Future init() async {
     try {
       if (TelegramWebApp.instance.isSupported) {

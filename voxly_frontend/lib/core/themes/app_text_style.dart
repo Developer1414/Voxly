@@ -7,4 +7,16 @@ class AppTextStyles {
     fontSize: 25.0,
     fontWeight: FontWeight.w700,
   );
+
+  static TextStyle notificationTitleTextTheme = GoogleFonts.robotoSlab(
+    color: Colors.black,
+    fontSize: 28.0,
+    fontWeight: FontWeight.w800,
+  );
+
+  static TextStyle alertMainTextTheme = GoogleFonts.robotoSlab(
+    color: Colors.black,
+    fontSize: 20.0,
+    fontWeight: FontWeight.w500,
+  );
 }

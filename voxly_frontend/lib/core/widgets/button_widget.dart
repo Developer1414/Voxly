@@ -6,16 +6,29 @@ import 'package:voxly_frontend/core/themes/app_colors.dart';
 import 'package:voxly_frontend/core/themes/app_text_style.dart';
 
 class ButtonWidget extends StatefulWidget {
-  const ButtonWidget({
+  ButtonWidget({
     super.key,
     this.isLoading = false,
+    Color? color,
+    double? fontSize,
+    EdgeInsets? padding,
     required this.onTap,
     required this.label,
-  });
+  }) : color = color ?? AppColors.buttonColor,
+       fontSize = fontSize ?? AppTextStyles.buttonTextTheme.fontSize!,
+       padding = padding ?? EdgeInsets.all(20.0);
 
   final bool isLoading;
+
   final VoidCallback onTap;
+
   final String label;
+
+  final Color color;
+
+  final double fontSize;
+
+  final EdgeInsets padding;
 
   @override
   State<ButtonWidget> createState() => _ButtonWidgetState();
@@ -64,10 +77,10 @@ class _ButtonWidgetState extends State<ButtonWidget> {
           )
           ..rotate(Vector3(0.0, 0.0, 1.0), _isTapped ? randomAngle : 0.0),
         duration: Duration(milliseconds: 100),
-        padding: EdgeInsets.all(20.0),
+        padding: widget.padding,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(25.0),
-          color: AppColors.buttonColor,
+          color: widget.color,
         ),
         child: AnimatedSize(
           duration: const Duration(milliseconds: 300),
@@ -78,7 +91,13 @@ class _ButtonWidgetState extends State<ButtonWidget> {
                   strokeCap: StrokeCap.round,
                   strokeWidth: 5.0,
                 )
-              : Text(widget.label, style: AppTextStyles.buttonTextTheme),
+              : Text(
+                  widget.label,
+                  style: AppTextStyles.buttonTextTheme.copyWith(
+                    fontSize: widget.fontSize,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
         ),
       ),
     );

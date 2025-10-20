@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:voxly_frontend/core/services/livekit_service.dart';
 import 'package:voxly_frontend/features/lobby/pages/lobby_page.dart';
 
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
@@ -23,6 +25,7 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      key: navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark(),
       home: LobbyPage(),

@@ -37,6 +37,10 @@ class LivekitService extends ChangeNotifier {
     _state = newState;
     _errorMessage = error;
 
+    if (error != null) {
+      showAlertWindow('Ошибка', error);
+    }
+
     notifyListeners();
   }
 
@@ -69,52 +73,41 @@ class LivekitService extends ChangeNotifier {
 
   void _registerSocketEvents() {
     socket.onConnect((_) {
-      print('Socket.IO: Подключено.');
       _setState(CallState.connected);
     });
 
     socket.onDisconnect((_) {
-      print('Socket.IO: Отключено.');
       _cleanUpCall(notify: false);
       _setState(CallState.disconnected);
     });
 
     socket.onConnectError((err) {
-      print('Socket.IO: Ошибка подключения: $err');
-      _setState(CallState.error, error: 'Не удалось подключиться к серверу.');
+      _setState(CallState.error); // , error: 'Не удалось подключиться к серверу.'
     });
 
     socket.on('error', (data) {
       final message = data?['message'] ?? 'Произошла неизвестная ошибка.';
-      print('Socket.IO: Ошибка от сервера: $message');
-      _setState(CallState.error, error: message);
+      _setState(CallState.error, error: 'Ошибка от сервера: $message');
     });
 
     socket.on('waiting', (_) {
-      print('Сервер: Ожидание собеседника...');
       _setState(CallState.waitingForMatch);
     });
 
     socket.on('match', (data) async {
-      print('Data: $data');
-
       try {
         final mapData = data as Map<String, dynamic>;
         final match = MatchData.fromJson(mapData);
 
-        print('Сервер: Собеседник найден! Партнер: ${match.partner}');
         partnerUsername = match.partner;
+
         await _connectToLiveKitRoom(match.liveKitUrl, match.token);
       } catch (e) {
-        print(
-          'Ошибка парсинга MatchData (вероятно, неверный формат данных): $e',
-        );
         _setState(CallState.error, error: 'Ошибка получения данных о комнате.');
       }
     });
 
     socket.on('ended', (_) async {
-      print('Сервер: Собеседник завершил звонок.');
       await _cleanUpCall();
       _setState(CallState.connected, error: 'Собеседник завершил звонок.');
     });
@@ -122,7 +115,7 @@ class LivekitService extends ChangeNotifier {
 
   void findMatch() {
     if (_state != CallState.connected) {
-      showAletWindow(
+      showAlertWindow(
         'Ошибка',
         'Нельзя начать поиск, текущее состояние: $_state',
       );
@@ -158,8 +151,6 @@ class LivekitService extends ChangeNotifier {
 
       _setState(CallState.inCall);
     } catch (e) {
-      print("LiveKit: Ошибка подключения к комнате: $e");
-
       socket.emit('end');
 
       _setState(CallState.error, error: "Не удалось подключиться к комнате.");

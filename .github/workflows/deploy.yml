@@ -26,29 +26,37 @@ jobs:
         run: flutter build web --release
         working-directory: ./voxly_frontend
 
-      - name: 5. Download build output
+      - name: 5. Prepare artifact
         run: mkdir build-artifact && cp -r voxly_frontend/build/web/* build-artifact/
 
-      - name: 6. Upload dist via SCP
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "build-artifact/."
-          target: "/var/www/voxly_frontend/"
-
-
-      - name: 7. Restart app on VPS
+      # ✅ Очищаем папку перед копированием
+      - name: 6. Clean old build on VPS
         uses: appleboy/ssh-action@v1.0.1
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            rm -rf /var/www/voxly_frontend/*
             mkdir -p /var/www/voxly_frontend
+
+      # ✅ Копируем только содержимое, без build-artifact
+      - name: 7. Upload dist via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "build-artifact/."
+          target: "/var/www/voxly_frontend"
+
+      # ✅ Рестартуем PM2
+      - name: 8. Restart app on VPS
+        uses: appleboy/ssh-action@v1.0.1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
             pm2 reload voxly-frontend || pm2 start http-server --name "voxly-frontend" -- /var/www/voxly_frontend -p 8080
             pm2 save
-
-
-

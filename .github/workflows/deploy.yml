@@ -10,9 +10,6 @@ on:
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
-    # Для этого шага не нужно разрешение contents: write, так как мы не пишем в репозиторий.
-    # permissions:
-    #   contents: write 
 
     steps:
       - name: 1. Проверка кода (Checkout)
@@ -28,16 +25,30 @@ jobs:
         run: flutter pub get
         working-directory: ./voxly_frontend
 
-      - name: 4. Сборка Flutter Web (Для корневого пути)
-        # Убираем --base-href /Voxly/, так как вы размещаете сайт в корне домена (voxly-audio.ru/)
-        # ЯВНО УКАЗЫВАЕМ ПУТЬ К ПРОЕКТУ FLUTTER, но не используем working-directory.
-        # Это заставит build/web создаться в корне репозитория (чтобы rsync его нашел)
-        run: flutter build web --release --project-directory ./voxly_frontend
+      - name: 4. Сборка Flutter Web
+        # Возвращаем стандартную команду. Папка build/web будет создана внутри voxly_frontend.
+        run: flutter build web --release
+        working-directory: ./voxly_frontend
           
-      - name: 5. Развертывание на VPS Selectel по SSH
+      # НОВЫЙ ШАГ 5: Сохраняем собранные файлы как артефакт
+      - name: 5. Сохранение собранных файлов (Upload Artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          # Сохраняем папку, созданную Flutter: voxly_frontend/build/web
+          path: voxly_frontend/build/web
+          name: flutter-web-build
+          
+      # НОВЫЙ ШАГ 6: Загружаем артефакт в новую, чистую папку для надежного rsync
+      - name: 6. Загрузка собранных файлов (Download Artifact)
+        uses: actions/download-artifact@v4
+        with:
+          name: flutter-web-build
+          # Файлы будут извлечены в папку: build-artifact
+          path: build-artifact
+          
+      - name: 7. Развертывание на VPS Selectel по SSH
         uses: appleboy/ssh-action@v1.0.1
         with:
-          # Используем секреты, созданные на GitHub
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -48,26 +59,22 @@ jobs:
             mkdir -p /var/www/voxly_frontend
             
             # 2. Очищаем старую сборку (важно для чистой установки)
-            # ! Очищаем только содержимое, не удаляем саму папку
             find /var/www/voxly_frontend -mindepth 1 -delete
             
             # --- START COPY LOGIC ---
-            # ПУТЬ ИЗМЕНЕН: Теперь Flutter Web будет собран в папке build/web в КОРНЕ репозитория,
-            # а не внутри voxly_frontend/. Это должно решить проблему rsync.
-            BUILD_SOURCE_PATH="${{ github.workspace }}/build/web/"
+            # ПУТЬ ИЗМЕНЕН: Теперь мы копируем из папки, созданной Шагом 6.
+            # Артефакт flutter-web-build был извлечен в build-artifact.
+            BUILD_SOURCE_PATH="${{ github.workspace }}/build-artifact/web/"
             # Целевой путь на VPS
             DEPLOY_TARGET_PATH="/var/www/voxly_frontend"
             
             echo "Attempting rsync from: $BUILD_SOURCE_PATH to $DEPLOY_TARGET_PATH"
             
             # 4. Копируем собранные файлы
-            # Используем флаг --delete для удаления старых файлов, которых нет в новой сборке.
             # Копируем содержимое $BUILD_SOURCE_PATH в $DEPLOY_TARGET_PATH
             rsync -avz --delete "$BUILD_SOURCE_PATH" "$DEPLOY_TARGET_PATH"
             
             # 5. Перезапускаем HTTP-сервер только после успешного копирования
-            # Используем явную команду pm2 reload.
-            # Если pm2 reload не сработает (первый запуск), запускаем pm2 start.
             echo "Restarting http-server..."
             pm2 reload voxly-frontend || pm2 start http-server --name "voxly-frontend" -- "$DEPLOY_TARGET_PATH" -p 8080
             

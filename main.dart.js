@@ -69143,7 +69143,7 @@ this.c=a
 if(b!=null)A.ayd("\u041e\u0448\u0438\u0431\u043a\u0430",b)
 this.ao()},
 jB(a){return this.mk(a,null)},
-p5(){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,c=this,b=null,a="https://voxly-backend.onrender.com",a0="query"
+p5(){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,c=this,b=null,a="http://212.74.226.227:3000",a0="query"
 if(c.c!==B.dP)return
 c.jB(B.kj)
 try{r=t.N
@@ -69157,7 +69157,7 @@ m=o.gcs()
 l=$.akf.V(n)&&$.akf.h(0,n).d.V(m)
 k=J.d(p.h(0,"forceNew"),!0)||J.d(p.h(0,"force new connection"),!0)||!1===p.h(0,"multiplex")||l
 j=A.cl()
-if(k){$.aCf().q(B.f,"ignoring socket cache for https://voxly-backend.onrender.com",b,b)
+if(k){$.aCf().q(B.f,"ignoring socket cache for http://212.74.226.227:3000",b,b)
 j.b=A.asF(p,a)}else{i=$.akf.h(0,n)
 if(i==null){i=A.asF(p,a)
 $.akf.l(0,n,i)}j.b=i}if(o.gj_().length!==0&&p.h(0,a0)==null)p.l(0,a0,o.gj_())

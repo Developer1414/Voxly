@@ -1,52 +1,40 @@
-name: Flutter Web CI/CD
+name: Deploy Flutter Web
 
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch:
 
 jobs:
-  build_and_deploy:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       - name: Install Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: "beta"
+          channel: stable
 
-      - name: Pub get
-        run: flutter pub get
-        working-directory: ./voxly_frontend
-
-      - name: Build web
+      - name: Build Flutter Web
         run: flutter build web --release
-        working-directory: ./voxly_frontend
 
-      # Очистка папки сайта на сервере
-      - name: Clean folder on VPS
-        uses: appleboy/ssh-action@v1.0.1
+      - name: Copy build to server
+        uses: appleboy/scp-action@v0.1.4
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: "build/web/*"
+          target: "/var/www/voxly_frontend"
+          strip_components: 2
+
+      - name: Reload Caddy
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            rm -rf /var/www/voxly_frontend/*
-            mkdir -p /var/www/voxly_frontend
-
-      # Копирование файлов сборки в корень сайта
-      - name: Upload build to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "*"
-          target: "/var/www/voxly_frontend/"
-          # Входная папка — уже build/web
-          working-directory: ./voxly_frontend/build/web
-
-
+            sudo systemctl reload caddy

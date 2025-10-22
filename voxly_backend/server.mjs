@@ -146,8 +146,14 @@ async function cleanupUserSession(socketId) {
 }
 
 // --- 5. Логика Socket.IO ---
-io.on("connection", async (socket) => {
+io.on("connection", (socket) => {
   console.log(`Пользователь подключен: ${socket.id}`);
+
+  socket.on("cancel_find", async (_data) => {
+    await cleanupUserSession(socket.id);
+    socket.emit("cancelled_find");
+    console.log(`Пользователь ${socket.id} отменил поиск.`);
+  });
 
   socket.on("find", async (data) => {
     try {

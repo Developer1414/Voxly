@@ -14,8 +14,6 @@ void showAlertWindow(
 
   if (context == null) return;
 
-  print('hello');
-
   showDialog(
     context: context,
     builder: (_) {
@@ -43,9 +41,16 @@ void showAlertWindow(
                   children: [
                     Text(
                       title,
-                      style: AppTextStyles.notificationTitleTextTheme,
+                      style: AppTextStyles.h1Theme.copyWith(
+                        color: Colors.black,
+                      ),
                     ),
-                    Text(message, style: AppTextStyles.alertMainTextTheme),
+                    Text(
+                      message,
+                      style: AppTextStyles.h3Theme.copyWith(
+                        color: Colors.black87,
+                      ),
+                    ),
                     Padding(
                       padding: const EdgeInsets.only(top: 10.0),
                       child: alertButtons.isEmpty

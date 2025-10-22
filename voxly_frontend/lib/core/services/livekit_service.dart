@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
-import 'package:voxly_frontend/app.dart';
 import 'package:voxly_frontend/core/models/livekit_model.dart';
 import 'package:voxly_frontend/core/services/telegram_service.dart';
 import 'package:voxly_frontend/core/widgets/alert_window.dart';
@@ -30,6 +29,10 @@ class LivekitService extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
 
   String? partnerUsername;
+
+  Stopwatch sessionTime = Stopwatch();
+
+  Timer? _sessionTimer;
 
   void _setState(CallState newState, {String? error}) {
     if (_state == newState && error == null) return;
@@ -82,7 +85,15 @@ class LivekitService extends ChangeNotifier {
     });
 
     socket.onConnectError((err) {
-      _setState(CallState.error); // , error: 'Не удалось подключиться к серверу.'
+      _setState(
+        CallState.error,
+      ); // , error: 'Не удалось подключиться к серверу.'
+    });
+
+    socket.on('cancelled_find', (data) async {
+      _setState(CallState.connected);
+
+      await _cleanUpCall(notify: true);
     });
 
     socket.on('error', (data) {
@@ -108,7 +119,7 @@ class LivekitService extends ChangeNotifier {
     });
 
     socket.on('ended', (_) async {
-      await _cleanUpCall();
+      await _cleanUpCall(notify: true);
       _setState(CallState.connected, error: 'Собеседник завершил звонок.');
     });
   }
@@ -126,6 +137,8 @@ class LivekitService extends ChangeNotifier {
     final name = TelegramService.instance.getUsername();
 
     socket.emit('find', {'userName': name});
+
+    _setState(CallState.waitingForMatch);
   }
 
   Future<void> endCall() async {
@@ -133,9 +146,19 @@ class LivekitService extends ChangeNotifier {
 
     socket.emit('end');
 
-    await _cleanUpCall();
+    await _cleanUpCall(notify: true);
 
     _setState(CallState.connected);
+  }
+
+  void cancelFind() => socket.emit('cancel_find');
+
+  Future<void> setMicrophoneState() async {
+    await room.localParticipant?.setMicrophoneEnabled(
+      !room.localParticipant!.isMicrophoneEnabled(),
+    );
+
+    notifyListeners();
   }
 
   Future<void> _connectToLiveKitRoom(String url, String token) async {
@@ -150,10 +173,23 @@ class LivekitService extends ChangeNotifier {
       await room.localParticipant?.setMicrophoneEnabled(true);
 
       _setState(CallState.inCall);
+
+      sessionTime
+        ..reset()
+        ..start();
+
+      _sessionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (sessionTime.isRunning) {
+          notifyListeners();
+        }
+      });
     } catch (e) {
       socket.emit('end');
 
-      _setState(CallState.error, error: "Не удалось подключиться к комнате.");
+      _setState(
+        CallState.error,
+        error: "Не удалось подключиться к комнате: $e",
+      );
     }
   }
 
@@ -161,6 +197,11 @@ class LivekitService extends ChangeNotifier {
     if (room.connectionState == ConnectionState.connected) {
       await room.disconnect();
     }
+
+    _sessionTimer?.cancel();
+    _sessionTimer = null;
+
+    sessionTime.stop();
 
     partnerUsername = null;
 
@@ -171,7 +212,12 @@ class LivekitService extends ChangeNotifier {
 
   @override
   void dispose() {
-    socket.dispose();
+    _cleanUpCall();
+
+    if (socket.connected) {
+      socket.dispose();
+    }
+
     room.dispose();
     super.dispose();
   }

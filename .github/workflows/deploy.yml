@@ -35,7 +35,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "build-artifact/*"
+          source: "*"
           target: "/var/www/voxly_frontend/"
 
 
@@ -49,4 +49,5 @@ jobs:
             mkdir -p /var/www/voxly_frontend
             pm2 reload voxly-frontend || pm2 start http-server --name "voxly-frontend" -- /var/www/voxly_frontend -p 8080
             pm2 save
+
 

@@ -46,21 +46,27 @@ jobs:
             mkdir -p /var/www/voxly_frontend
             
             # 2. Очищаем старую сборку (важно для чистой установки)
-            rm -rf /var/www/voxly_frontend/*
+            # ! Очищаем только содержимое, не удаляем саму папку
+            find /var/www/voxly_frontend -mindepth 1 -delete
             
             # --- START COPY LOGIC ---
-            # 3. Переходим в папку, куда будут копироваться файлы
-            cd /var/www/voxly_frontend
+            # Путь к собранным файлам Flutter в runner'е GitHub Actions
+            BUILD_SOURCE_PATH="${{ github.workspace }}/voxly_frontend/build/web/"
+            # Целевой путь на VPS
+            DEPLOY_TARGET_PATH="/var/www/voxly_frontend"
             
-            # 4. Копируем собранные файлы из папки GitHub Actions на VPS
-            # Убеждаемся, что исходный путь верен.
-            BUILD_PATH="${{ github.workspace }}/voxly_frontend/build/web/"
+            echo "Attempting rsync from: $BUILD_SOURCE_PATH to $DEPLOY_TARGET_PATH"
             
-            echo "Attempting rsync from: $BUILD_PATH"
+            # 4. Копируем собранные файлы
+            # Используем флаг --delete для удаления старых файлов, которых нет в новой сборке.
+            # Копируем содержимое $BUILD_SOURCE_PATH в $DEPLOY_TARGET_PATH
+            rsync -avz --delete "$BUILD_SOURCE_PATH" "$DEPLOY_TARGET_PATH"
             
-            # Выполняем rsync. Если папка пуста или не найдена, rsync не сработает.
-            rsync -avzh "$BUILD_PATH" ./
+            # 5. Перезапускаем HTTP-сервер только после успешного копирования
+            # Используем явную команду pm2 reload.
+            # Если pm2 reload не сработает (первый запуск), запускаем pm2 start.
+            echo "Restarting http-server..."
+            pm2 reload voxly-frontend || pm2 start http-server --name "voxly-frontend" -- "$DEPLOY_TARGET_PATH" -p 8080
             
-            # 5. Перезапускаем HTTP-сервер, который обслуживает эти файлы
-            # Теперь, когда вы установите PM2, эта команда будет работать:
-            pm2 reload voxly-frontend || pm2 start http-server --name "voxly-frontend" -- /var/www/voxly_frontend -p 8080
+            # 6. Сохраняем состояние PM2 на всякий случай
+            pm2 save

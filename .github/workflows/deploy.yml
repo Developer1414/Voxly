@@ -1,66 +1,70 @@
-name: Deploy
+name: Flutter Web CI/CD
 
 on:
   push:
     branches:
       - main
 
+  workflow_dispatch:
+
 jobs:
-  build:
+  build_and_deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
+      - name: 1. Проверка кода (Checkout)
         uses: actions/checkout@v4
 
-      - name: Set up Flutter (beta)
+      - name: 2. Настройка Flutter SDK
         uses: subosito/flutter-action@v2
         with:
-          channel: beta
+          channel: 'beta'
 
-      - name: Clean
-        working-directory: ./voxly_frontend
-        run: flutter clean
-
-      - name: Install dependencies
-        working-directory: ./voxly_frontend
+      - name: 3. Получение зависимостей
+        # Запускаем pub get в папке проекта Flutter
         run: flutter pub get
-
-      - name: Build Flutter web
         working-directory: ./voxly_frontend
+
+      - name: 4. Сборка Flutter Web
+        # Папка build/web будет создана внутри voxly_frontend.
         run: flutter build web --release
-
-      - name: Save build folder
-        uses: actions/upload-artifact@v4
+        working-directory: ./voxly_frontend
+          
+      - name: 5. Развертывание на VPS Selectel по SSH
+        uses: appleboy/ssh-action@v1.0.1
         with:
-          name: web_build
-          path: voxly_frontend/build/web
-
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Download build
-        uses: actions/download-artifact@v4
-        with:
-          name: web_build
-          path: build
-
-      - run: set -eu
-      - run: mkdir "$HOME/.ssh"
-      - run: echo "${{ secrets.SSH_KEY }}" > "$HOME/.ssh/id_rsa"
-      - run: chmod 600 "$HOME/.ssh/id_rsa"
-
-      - name: Deploy to server
-        run: |
-          rsync -e "ssh -p 22 -i $HOME/.ssh/id_rsa -o StrictHostKeyChecking=no" \
-          --archive --compress --delete \
-          build/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/voxly_frontend
-
-      - name: Reload Caddy
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_KEY }}
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          
+          # Команда, которая выполняется на вашем VPS
           script: |
-            sudo systemctl reload caddy
+            # 1. Создаем папку для фронтенда, если ее нет
+            mkdir -p /var/www/voxly_frontend
+            
+            # 2. Очищаем старую сборку (важно для чистой установки)
+            find /var/www/voxly_frontend -mindepth 1 -delete
+            
+            # --- START COPY LOGIC ---
+            # ИСХОДНЫЙ ПУТЬ: Путь к папке, которую Flutter создал в runner'е
+            BUILD_SOURCE_DIR="${{ github.workspace }}/voxly_frontend/build/web/"
+            # Целевой путь на VPS
+            DEPLOY_TARGET_DIR="/var/www/voxly_frontend"
+            
+            # ДИАГНОСТИКА: Убедимся, что файлы существуют перед rsync
+            echo "--- Diagnostics ---"
+            echo "Listing files in source directory: $BUILD_SOURCE_DIR"
+            ls -al "$BUILD_SOURCE_DIR"
+            echo "-------------------"
+            
+            # 4. Копируем собранные файлы
+            # КОПИРОВАНИЕ: Копируем содержимое $BUILD_SOURCE_DIR в $DEPLOY_TARGET_DIR
+            # Флаг --delete удаляет файлы на VPS, которых нет в локальной сборке.
+            rsync -avz --delete "$BUILD_SOURCE_DIR" "$DEPLOY_TARGET_DIR"
+            
+            # 5. Перезапускаем HTTP-сервер только после успешного копирования
+            echo "Restarting http-server..."
+            pm2 reload voxly-frontend || pm2 start http-server --name "voxly-frontend" -- "$DEPLOY_TARGET_DIR" -p 8080
+            
+            # 6. Сохраняем состояние PM2 на всякий случай
+            pm2 save

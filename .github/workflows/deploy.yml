@@ -30,17 +30,21 @@ jobs:
         run: flutter build web --release
         working-directory: ./voxly_frontend
           
-      # --- НОВЫЙ ШАГ ДЛЯ ИСПРАВЛЕНИЯ ПУТИ RSYNC ---
-      - name: 5. Перенос собранных файлов в корень
-        # Копируем содержимое собранной папки в папку `web_deploy` в корневом каталоге
-        run: |
-          mkdir -p web_deploy
-          cp -r ./voxly_frontend/build/web/* ./web_deploy/
-          echo "Проверка содержимого папки для деплоя:"
-          ls -al web_deploy/
-        # --- КОНЕЦ НОВОГО ШАГА ---
+      # --- НОВЫЙ ШАГ: ПУБЛИКАЦИЯ В ВЕТКУ GH-PAGES ---
+      - name: 5. Публикация веб-сборки в ветку gh-pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          # Убедитесь, что у вашего репозитория включено право записи (Permissions > Actions > General > Read and write permissions)
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Содержимое папки flutter_frontend/build/web будет помещено в корень gh-pages
+          publish_dir: ./voxly_frontend/build/web 
+          # Публикуем в ветку gh-pages
+          publish_branch: gh-pages
+          # Используем простое сообщение коммита
+          commit_message: "Deploying Flutter Web build via CI/CD"
         
-      - name: 6. Развертывание на VPS Selectel по SSH
+      # --- ОБНОВЛЕННЫЙ ШАГ: СКАЧИВАНИЕ ИЗ GH-PAGES НА VPS ---
+      - name: 6. Развертывание на VPS Selectel (Скачивание с gh-pages)
         uses: appleboy/ssh-action@v1.0.1
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -49,33 +53,44 @@ jobs:
           
           # Команда, которая выполняется на вашем VPS
           script: |
-            # 1. Создаем папку для фронтенда, если ее нет, и гарантируем, что пользователь имеет права на запись
+            # 1. Определяем переменные
+            REPO_NAME="${{ github.repository }}"
             DEPLOY_TARGET_DIR="/var/www/voxly_frontend"
-            mkdir -p "$DEPLOY_TARGET_DIR"
-            # Убеждаемся, что текущий SSH-пользователь (например, root) владеет папкой
-            chown -R $(whoami):$(whoami) "$DEPLOY_TARGET_DIR"
+            TEMP_ARCHIVE="/tmp/gh-pages-build.zip"
+            TEMP_DIR="/tmp/gh-pages-content"
             
-            # 2. Очищаем старую сборку (важно для чистой установки)
+            # URL для скачивания ZIP-архива ветки gh-pages
+            # Формат: https://api.github.com/repos/{owner}/{repo}/zipball/{branch}
+            DOWNLOAD_URL="https://api.github.com/repos/$REPO_NAME/zipball/gh-pages"
+
+            echo "Скачивание артефакта из $DOWNLOAD_URL"
+
+            # 2. Скачиваем ZIP-архив с GitHub API (требует установленного wget на VPS)
+            # Необходимо установить wget и unzip на VPS
+            wget -q -O "$TEMP_ARCHIVE" "$DOWNLOAD_URL"
+            
+            # 3. Распаковываем архив во временную папку
+            mkdir -p "$TEMP_DIR"
+            unzip -q -o "$TEMP_ARCHIVE" -d "$TEMP_DIR"
+            
+            # 4. Находим корневую папку с файлами внутри архива (она имеет случайное имя)
+            # Ищем папку, которая не является системной (. или ..)
+            BUILD_FOLDER=$(find "$TEMP_DIR" -mindepth 1 -maxdepth 1 -type d | head -n 1)
+            
+            # 5. Очищаем целевую папку на VPS
+            mkdir -p "$DEPLOY_TARGET_DIR"
             find "$DEPLOY_TARGET_DIR" -mindepth 1 -delete
             
-            # --- START COPY LOGIC ---
-            # ИСХОДНЫЙ ПУТЬ: Теперь он простой и гарантированно существует
-            BUILD_SOURCE_DIR="${{ github.workspace }}/web_deploy"
-            # Целевой путь на VPS
-            
-            # ДИАГНОСТИКА: Убедимся, что файлы существуют перед rsync
-            echo "--- Diagnostics ---"
-            echo "Listing files in source directory: $BUILD_SOURCE_DIR"
-            ls -al "$BUILD_SOURCE_DIR"
-            echo "-------------------"
-            
-            # 4. Копируем собранные файлы
-            # Копируем СОДЕРЖИМОЕ папки web_deploy в целевую папку.
-            rsync -avz --delete "$BUILD_SOURCE_DIR"/ "$DEPLOY_TARGET_DIR"
-            
-            # 5. Перезапускаем HTTP-сервер только после успешного копирования
+            # 6. Копируем файлы из временной папки в целевую
+            # Копируем СОДЕРЖИМОЕ $BUILD_FOLDER в $DEPLOY_TARGET_DIR
+            cp -r "$BUILD_FOLDER"/* "$DEPLOY_TARGET_DIR"/
+
+            # 7. Уборка
+            rm -rf "$TEMP_DIR" "$TEMP_ARCHIVE"
+
+            # 8. Перезапускаем HTTP-сервер 
             echo "Restarting http-server..."
             pm2 reload voxly-frontend || pm2 start http-server --name "voxly-frontend" -- "$DEPLOY_TARGET_DIR" -p 8080
             
-            # 6. Сохраняем состояние PM2 на всякий случай
+            # 9. Сохраняем состояние PM2 
             pm2 save

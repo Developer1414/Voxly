@@ -10,8 +10,9 @@ on:
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    # Для этого шага не нужно разрешение contents: write, так как мы не пишем в репозиторий.
+    # permissions:
+    #   contents: write 
 
     steps:
       - name: 1. Проверка кода (Checkout)
@@ -26,14 +27,34 @@ jobs:
         run: flutter pub get
         working-directory: ./voxly_frontend
 
-      - name: 4. Сборка Flutter Web
-        run: |
-            flutter build web --release --base-href /Voxly/
+      - name: 4. Сборка Flutter Web (Для корневого пути)
+        # Убираем --base-href /Voxly/, так как вы размещаете сайт в корне домена (voxly-audio.ru/)
+        run: flutter build web --release
         working-directory: ./voxly_frontend
           
-      - name: 5. Развертывание на GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+      - name: 5. Развертывание на VPS Selectel по SSH
+        uses: appleboy/ssh-action@v1.0.1
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./voxly_frontend/build/web
-          publish_branch: gh-pages
+          # Используем секреты, созданные на GitHub
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          
+          # Команда, которая выполняется на вашем VPS
+          script: |
+            # 1. Создаем папку для фронтенда, если ее нет
+            mkdir -p /var/www/voxly_frontend
+            
+            # 2. Очищаем старую сборку (важно для чистой установки)
+            rm -rf /var/www/voxly_frontend/*
+            
+            # 3. Переходим в папку, куда будут копироваться файлы
+            cd /var/www/voxly_frontend
+            
+            # 4. Копируем собранные файлы из папки GitHub Actions на VPS
+            # (Rsync - это мощный инструмент для передачи данных)
+            rsync -avzh ${{ github.workspace }}/voxly_frontend/build/web/ ./
+            
+            # 5. Перезапускаем HTTP-сервер, который обслуживает эти файлы
+            # (Мы предположили, что вы используете PM2 для http-server на порту 8080)
+            pm2 reload voxly-frontend || pm2 start http-server --name "voxly-frontend" -- /var/www/voxly_frontend -p 8080

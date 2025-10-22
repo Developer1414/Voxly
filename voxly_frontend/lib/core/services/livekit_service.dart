@@ -58,9 +58,7 @@ class LivekitService extends ChangeNotifier {
             ? 'http://localhost:3000'
             : 'wss://voxly-audio.ru/ws',  //'https://voxly-backend.onrender.com',
         IO.OptionBuilder()
-            .setTransports(['websocket'])
             .disableAutoConnect()
-            .setPath('/ws/socket.io/')
             .build(),
       );
 

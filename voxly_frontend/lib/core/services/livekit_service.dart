@@ -60,6 +60,7 @@ class LivekitService extends ChangeNotifier {
         IO.OptionBuilder()
             .setTransports(['websocket'])
             .disableAutoConnect()
+            .setPath('/ws/socket.io/')
             .build(),
       );
 

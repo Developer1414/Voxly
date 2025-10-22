@@ -39,28 +39,32 @@ jobs:
           
           # Команда, которая выполняется на вашем VPS
           script: |
-            # 1. Создаем папку для фронтенда, если ее нет
-            mkdir -p /var/www/voxly_frontend
+            # 1. Создаем папку для фронтенда, если ее нет, и гарантируем, что пользователь имеет права на запись
+            DEPLOY_TARGET_DIR="/var/www/voxly_frontend"
+            mkdir -p "$DEPLOY_TARGET_DIR"
+            # Убеждаемся, что текущий SSH-пользователь (например, root) владеет папкой
+            chown -R $(whoami):$(whoami) "$DEPLOY_TARGET_DIR"
             
             # 2. Очищаем старую сборку (важно для чистой установки)
-            find /var/www/voxly_frontend -mindepth 1 -delete
+            find "$DEPLOY_TARGET_DIR" -mindepth 1 -delete
             
             # --- START COPY LOGIC ---
-            # ИСХОДНЫЙ ПУТЬ: Путь к папке, которую Flutter создал в runner'е
-            BUILD_SOURCE_DIR="${{ github.workspace }}/voxly_frontend/build/web/"
+            # ИСХОДНЫЙ ПУТЬ: Упрощаем путь, убирая завершающий слэш.
+            # Мы используем гарантированное расположение: [корень_рабочей_области]/[папка_проекта]/build/web
+            BUILD_SOURCE_DIR="${{ github.workspace }}/voxly_frontend/build/web"
             # Целевой путь на VPS
-            DEPLOY_TARGET_DIR="/var/www/voxly_frontend"
             
             # ДИАГНОСТИКА: Убедимся, что файлы существуют перед rsync
             echo "--- Diagnostics ---"
             echo "Listing files in source directory: $BUILD_SOURCE_DIR"
+            # Если Flutter не создал папку, то это будет последняя команда диагностики
             ls -al "$BUILD_SOURCE_DIR"
             echo "-------------------"
             
             # 4. Копируем собранные файлы
-            # КОПИРОВАНИЕ: Копируем содержимое $BUILD_SOURCE_DIR в $DEPLOY_TARGET_DIR
-            # Флаг --delete удаляет файлы на VPS, которых нет в локальной сборке.
-            rsync -avz --delete "$BUILD_SOURCE_DIR" "$DEPLOY_TARGET_DIR"
+            # ВАЖНО: При копировании папки БЕЗ завершающего слэша в rsync,
+            # мы добавляем слэш (/) к имени исходной папки, чтобы скопировать ее СОДЕРЖИМОЕ.
+            rsync -avz --delete "$BUILD_SOURCE_DIR"/ "$DEPLOY_TARGET_DIR"
             
             # 5. Перезапускаем HTTP-сервер только после успешного копирования
             echo "Restarting http-server..."

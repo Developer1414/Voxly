@@ -56,11 +56,11 @@ class LivekitService extends ChangeNotifier {
       socket = IO.io(
         kDebugMode
             ? 'http://localhost:3000'
-            : 'wss://voxly-audio.ru/ws', //'https://voxly-backend.onrender.com',
+            : 'https://voxly-audio.ru', //'https://voxly-backend.onrender.com',
         IO.OptionBuilder()
             .setTransports(['websocket', 'polling'])
             .disableAutoConnect()
-            .setPath('/ws/socket.io/')
+            .setPath('/socket.io/')
             .build(),
       );
 

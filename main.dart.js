@@ -22314,7 +22314,7 @@ if(n!=null)i.A(0,n)
 a.l(0,r,i)
 if(a.h(0,"path")==null)a.l(0,"path","/socket.io")
 k.f=a
-k.w=a.h(0,"reconnection")!==!1
+k.w=!J.d(a.h(0,"reconnection"),!1)
 n=a.h(0,"reconnectionAttempts")
 k.x=n==null?1/0:n
 n=a.h(0,"reconnectionDelay")
@@ -22334,7 +22334,7 @@ k.as=n==null?2e4:n
 k.ay=b
 if(a.h(0,p)!=null){k.cx=a.h(0,p).a95()
 k.cy=a.h(0,p).a93()}else{k.cx=new A.Xp()
-k.cy=new A.Wr(A.c2(s,s,s,o,m),A.c2(s,s,s,o,m),A.b([],l))}o=a.h(0,"autoConnect")!==!1
+k.cy=new A.Wr(A.c2(s,s,s,o,m),A.c2(s,s,s,o,m),A.b([],l))}o=!J.d(a.h(0,"autoConnect"),!1)
 k.db=o
 if(o)k.iU()
 return k},
@@ -69149,12 +69149,14 @@ c.jB(B.kj)
 try{r=t.N
 q=t.z
 p=A.u(r,q)
+p.l(0,"transports",A.b(["websocket","polling"],t.s))
 p.l(0,"autoConnect",!1)
+p.l(0,"path","/ws/socket.io/")
 o=A.dB(a,0,b)
 n=o.gcv()+"://"+o.gf3()+":"+o.glx()
 m=o.gcs()
 l=$.akf.V(n)&&$.akf.h(0,n).d.V(m)
-k=p.h(0,"forceNew")===!0||p.h(0,"force new connection")===!0||!1===p.h(0,"multiplex")||l
+k=J.d(p.h(0,"forceNew"),!0)||J.d(p.h(0,"force new connection"),!0)||!1===p.h(0,"multiplex")||l
 j=A.cl()
 if(k){$.aCf().q(B.f,"ignoring socket cache for wss://voxly-audio.ru/ws",b,b)
 j.b=A.asF(p,a)}else{i=$.akf.h(0,n)

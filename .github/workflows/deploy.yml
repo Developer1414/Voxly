@@ -44,5 +44,9 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "voxly_frontend/build/web/*"
+          source: "*"
           target: "/var/www/voxly_frontend/"
+          # Входная папка — уже build/web
+          working-directory: ./voxly_frontend/build/web
+
+

@@ -12,14 +12,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Install Flutter
+      - name: Install Flutter (beta)
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          channel: beta
 
       - name: Build Flutter Web
         working-directory: ./voxly_frontend
-        run: flutter build web --release
+        run: |
+          flutter --version
+          flutter pub get
+          flutter build web --release
 
       - name: Copy build to server
         uses: appleboy/scp-action@v0.1.4

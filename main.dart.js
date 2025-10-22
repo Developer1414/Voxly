@@ -69151,6 +69151,7 @@ q=t.z
 p=A.u(r,q)
 p.l(0,"transports",A.b(["websocket"],t.s))
 p.l(0,"autoConnect",!1)
+p.l(0,"path","/ws/socket.io/")
 o=A.dB(a,0,b)
 n=o.gcv()+"://"+o.gf3()+":"+o.glx()
 m=o.gcs()

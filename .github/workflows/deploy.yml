@@ -30,7 +30,7 @@ jobs:
         run: flutter build web --release
         working-directory: ./voxly_frontend
           
-      # НОВЫЙ ШАГ 5: Сохраняем собранные файлы как артефакт
+      # ШАГ 5: Сохраняем собранные файлы как артефакт
       - name: 5. Сохранение собранных файлов (Upload Artifact)
         uses: actions/upload-artifact@v4
         with:
@@ -38,13 +38,21 @@ jobs:
           path: voxly_frontend/build/web
           name: flutter-web-build
           
-      # НОВЫЙ ШАГ 6: Загружаем артефакт в новую, чистую папку для надежного rsync
+      # ШАГ 6: Загружаем артефакт в новую, чистую папку для надежного rsync
       - name: 6. Загрузка собранных файлов (Download Artifact)
         uses: actions/download-artifact@v4
         with:
           name: flutter-web-build
           # Файлы будут извлечены в папку: build-artifact
           path: build-artifact
+
+      # НОВЫЙ ШАГ ДЛЯ ДИАГНОСТИКИ: Вывод содержимого артефакта
+      - name: 6.5. Диагностика: Проверка пути к файлам
+        run: |
+          echo "Содержимое build-artifact:"
+          ls -R build-artifact
+          echo "Содержимое build-artifact/web:"
+          ls -R build-artifact/web
           
       - name: 7. Развертывание на VPS Selectel по SSH
         uses: appleboy/ssh-action@v1.0.1

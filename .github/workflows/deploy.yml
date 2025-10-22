@@ -30,7 +30,17 @@ jobs:
         run: flutter build web --release
         working-directory: ./voxly_frontend
           
-      - name: 5. Развертывание на VPS Selectel по SSH
+      # --- НОВЫЙ ШАГ ДЛЯ ИСПРАВЛЕНИЯ ПУТИ RSYNC ---
+      - name: 5. Перенос собранных файлов в корень
+        # Копируем содержимое собранной папки в папку `web_deploy` в корневом каталоге
+        run: |
+          mkdir -p web_deploy
+          cp -r ./voxly_frontend/build/web/* ./web_deploy/
+          echo "Проверка содержимого папки для деплоя:"
+          ls -al web_deploy/
+        # --- КОНЕЦ НОВОГО ШАГА ---
+        
+      - name: 6. Развертывание на VPS Selectel по SSH
         uses: appleboy/ssh-action@v1.0.1
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -47,25 +57,20 @@ jobs:
             
             # 2. Очищаем старую сборку (важно для чистой установки)
             find "$DEPLOY_TARGET_DIR" -mindepth 1 -delete
-
-            echo "workspace: ${{ github.workspace }}"
             
             # --- START COPY LOGIC ---
-            # ИСХОДНЫЙ ПУТЬ: Упрощаем путь, убирая завершающий слэш.
-            # Мы используем гарантированное расположение: [корень_рабочей_области]/[папка_проекта]/build/web
-            BUILD_SOURCE_DIR="${{ github.workspace }}/voxly_frontend/build/web"
+            # ИСХОДНЫЙ ПУТЬ: Теперь он простой и гарантированно существует
+            BUILD_SOURCE_DIR="${{ github.workspace }}/web_deploy"
             # Целевой путь на VPS
             
             # ДИАГНОСТИКА: Убедимся, что файлы существуют перед rsync
             echo "--- Diagnostics ---"
             echo "Listing files in source directory: $BUILD_SOURCE_DIR"
-            # Если Flutter не создал папку, то это будет последняя команда диагностики
             ls -al "$BUILD_SOURCE_DIR"
             echo "-------------------"
             
             # 4. Копируем собранные файлы
-            # ВАЖНО: При копировании папки БЕЗ завершающего слэша в rsync,
-            # мы добавляем слэш (/) к имени исходной папки, чтобы скопировать ее СОДЕРЖИМОЕ.
+            # Копируем СОДЕРЖИМОЕ папки web_deploy в целевую папку.
             rsync -avz --delete "$BUILD_SOURCE_DIR"/ "$DEPLOY_TARGET_DIR"
             
             # 5. Перезапускаем HTTP-сервер только после успешного копирования
@@ -74,4 +79,3 @@ jobs:
             
             # 6. Сохраняем состояние PM2 на всякий случай
             pm2 save
-

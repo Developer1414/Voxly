@@ -10,24 +10,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 1. Checkout
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: 2. Install Flutter
+      - name: Install Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: "beta"
 
-      - name: 3. Pub get
+      - name: Pub get
         run: flutter pub get
         working-directory: ./voxly_frontend
 
-      - name: 4. Build web
+      - name: Build web
         run: flutter build web --release
         working-directory: ./voxly_frontend
 
-      # ✅ Очищаем папку на сервере перед копированием
-      - name: 5. Clean old build on VPS
+      # Очистка папки сайта на сервере
+      - name: Clean folder on VPS
         uses: appleboy/ssh-action@v1.0.1
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -37,23 +37,12 @@ jobs:
             rm -rf /var/www/voxly_frontend/*
             mkdir -p /var/www/voxly_frontend
 
-      # ✅ Копируем напрямую из build/web
-      - name: 6. Upload dist via SCP
+      # Копирование файлов сборки в корень сайта
+      - name: Upload build to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "voxly_frontend/build/web/."
-          target: "/var/www/voxly_frontend"
-
-      # ✅ Перезапускаем pm2
-      - name: 7. Restart app on VPS
-        uses: appleboy/ssh-action@v1.0.1
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            pm2 reload voxly-frontend || pm2 start http-server --name "voxly-frontend" -- /var/www/voxly_frontend -p 8080
-            pm2 save
+          source: "voxly_frontend/build/web/*"
+          target: "/var/www/voxly_frontend/"

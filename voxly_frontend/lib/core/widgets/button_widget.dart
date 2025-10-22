@@ -6,16 +6,32 @@ import 'package:voxly_frontend/core/themes/app_colors.dart';
 import 'package:voxly_frontend/core/themes/app_text_style.dart';
 
 class ButtonWidget extends StatefulWidget {
-  const ButtonWidget({
+  ButtonWidget({
     super.key,
     this.isLoading = false,
+    Color? color,
+    double? fontSize,
+    EdgeInsets? padding,
     required this.onTap,
-    required this.label,
-  });
+    this.label,
+    this.child,
+  }) : assert(
+         label != null || child != null,
+         'ButtonWidget must have either a label or a child.',
+       ),
+       color = color ?? AppColors.buttonColor,
+       fontSize = fontSize ?? AppTextStyles.h2Theme.fontSize!,
+       padding = padding ?? const EdgeInsets.all(20.0);
 
   final bool isLoading;
   final VoidCallback onTap;
-  final String label;
+
+  final String? label;
+  final Widget? child;
+
+  final Color color;
+  final double fontSize;
+  final EdgeInsets padding;
 
   @override
   State<ButtonWidget> createState() => _ButtonWidgetState();
@@ -24,32 +40,60 @@ class ButtonWidget extends StatefulWidget {
 class _ButtonWidgetState extends State<ButtonWidget> {
   bool _isTapped = false;
 
-  double randomAngle = 0.0;
-  double randomScale = 0.0;
+  double _randomAngle = 0.0;
+  double _randomScale = 0.0;
 
   double getRandomNumber(double min, double max) {
     final random = Random();
     return min + random.nextDouble() * (max - min);
   }
 
+  Widget _buildContent() {
+    if (widget.isLoading) {
+      return const CircularProgressIndicator(
+        color: Colors.white,
+        strokeCap: StrokeCap.round,
+        strokeWidth: 5.0,
+      );
+    }
+
+    if (widget.child != null) {
+      return widget.child!;
+    }
+
+    return Text(
+      widget.label!,
+      style: AppTextStyles.h2Theme.copyWith(fontSize: widget.fontSize),
+      textAlign: TextAlign.center,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: widget.onTap,
-      onTapDown: (details) {
-        setState(() {
-          randomAngle = getRandomNumber(-0.05, 0.05);
-          randomScale = getRandomNumber(0.90, 0.95);
+    final effectiveOnTap = widget.isLoading ? null : widget.onTap;
 
-          _isTapped = true;
-        });
+    return GestureDetector(
+      onTap: effectiveOnTap,
+      onTapDown: (details) {
+        if (!widget.isLoading) {
+          setState(() {
+            _randomAngle = getRandomNumber(-0.05, 0.05);
+            _randomScale = getRandomNumber(0.90, 0.95);
+
+            _isTapped = true;
+          });
+        }
       },
       onTapCancel: () {
+        if (!_isTapped) return;
+
         setState(() {
           _isTapped = false;
         });
       },
       onTapUp: (details) {
+        if (!_isTapped) return;
+
         setState(() {
           _isTapped = false;
         });
@@ -59,26 +103,20 @@ class _ButtonWidgetState extends State<ButtonWidget> {
         transform: Matrix4.identity()
           ..scaleByVector3(
             _isTapped
-                ? Vector3(randomScale, randomScale, 1.0)
+                ? Vector3(_randomScale, _randomScale, 1.0)
                 : Vector3(1.0, 1.0, 1.0),
           )
-          ..rotate(Vector3(0.0, 0.0, 1.0), _isTapped ? randomAngle : 0.0),
-        duration: Duration(milliseconds: 100),
-        padding: EdgeInsets.all(20.0),
+          ..rotate(Vector3(0.0, 0.0, 1.0), _isTapped ? _randomAngle : 0.0),
+        duration: const Duration(milliseconds: 100),
+        padding: widget.padding,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(25.0),
-          color: AppColors.buttonColor,
+          color: widget.color,
         ),
         child: AnimatedSize(
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOutBack,
-          child: widget.isLoading
-              ? CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeCap: StrokeCap.round,
-                  strokeWidth: 5.0,
-                )
-              : Text(widget.label, style: AppTextStyles.buttonTextTheme),
+          child: _buildContent(),
         ),
       ),
     );

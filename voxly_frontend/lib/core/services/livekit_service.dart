@@ -3,24 +3,16 @@ import 'package:flutter/foundation.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:voxly_frontend/core/models/livekit_model.dart';
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-// НЕОБХОДИМЫЙ ИМПОРТ МОДЕЛИ (убедитесь, что файл livekit_models.dart существует)
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+import 'package:voxly_frontend/core/services/telegram_service.dart';
+import 'package:voxly_frontend/core/widgets/alert_window.dart';
 
-// Для примера. Замените на ваш способ получения имени пользователя.
-class TelegramServiceLivekit {
-  static final instance = TelegramServiceLivekit();
-  String get username => 'flutter_user_${DateTime.now().millisecond}';
-}
-
-/// Перечисление для удобного управления состоянием в UI.
 enum CallState {
-  disconnected, // Нет подключения к серверу
-  connecting, // Идет подключение к серверу
-  connected, // Подключено к серверу, ожидание действий
-  waitingForMatch, // В очереди на поиск собеседника
-  inCall, // В процессе звонка
-  error, // Произошла ошибка
+  disconnected,
+  connecting,
+  connected,
+  waitingForMatch,
+  inCall,
+  error,
 }
 
 class LivekitService extends ChangeNotifier {
@@ -28,10 +20,8 @@ class LivekitService extends ChangeNotifier {
   static LivekitService get instance => internal;
 
   final room = Room();
-  // Делаем late, так как инициализация происходит в connect()
   late IO.Socket socket;
 
-  // --- Улучшенное управление состоянием ---
   var _state = CallState.disconnected;
   CallState get state => _state;
 
@@ -40,32 +30,41 @@ class LivekitService extends ChangeNotifier {
 
   String? partnerUsername;
 
-  // Приватный сеттер для централизованного обновления состояния и UI
+  Stopwatch sessionTime = Stopwatch();
+
+  Timer? _sessionTimer;
+
   void _setState(CallState newState, {String? error}) {
     if (_state == newState && error == null) return;
+
     _state = newState;
     _errorMessage = error;
-    notifyListeners(); // Уведомляем UI об изменениях
+
+    if (error != null) {
+      showAlertWindow('Ошибка', error);
+    }
+
+    notifyListeners();
   }
 
-  /// Инициализирует и подключается к сокет-серверу.
   void connect() {
-    // Предотвращаем повторное подключение
     if (_state != CallState.disconnected) return;
 
     _setState(CallState.connecting);
 
     try {
       socket = IO.io(
-        'https://voxly-backend.onrender.com',
-        //'http://localhost:3000', // Укажите ваш IP-адрес, если запускаете на реальном устройстве
+        kDebugMode
+            ? 'http://localhost:3000'
+            : 'https://voxly-backend.onrender.com',
         IO.OptionBuilder()
             .setTransports(['websocket'])
-            .disableAutoConnect() // Управляем подключением вручную
+            .disableAutoConnect()
             .build(),
       );
 
       _registerSocketEvents();
+
       socket.connect();
     } catch (e) {
       _setState(
@@ -75,124 +74,150 @@ class LivekitService extends ChangeNotifier {
     }
   }
 
-  /// Регистрирует все обработчики событий сокета.
   void _registerSocketEvents() {
     socket.onConnect((_) {
-      print('Socket.IO: Подключено.');
       _setState(CallState.connected);
     });
 
     socket.onDisconnect((_) {
-      print('Socket.IO: Отключено.');
-      _cleanUpCall(notify: false); // Очищаем данные звонка без уведомления UI
+      _cleanUpCall(notify: false);
       _setState(CallState.disconnected);
     });
 
     socket.onConnectError((err) {
-      print('Socket.IO: Ошибка подключения: $err');
-      _setState(CallState.error, error: 'Не удалось подключиться к серверу.');
+      _setState(
+        CallState.error,
+      ); // , error: 'Не удалось подключиться к серверу.'
     });
 
-    // Обработка ошибок, приходящих от сервера
+    socket.on('cancelled_find', (data) async {
+      _setState(CallState.connected);
+
+      await _cleanUpCall(notify: true);
+    });
+
     socket.on('error', (data) {
       final message = data?['message'] ?? 'Произошла неизвестная ошибка.';
-      print('Socket.IO: Ошибка от сервера: $message');
-      _setState(CallState.error, error: message);
+      _setState(CallState.error, error: 'Ошибка от сервера: $message');
     });
 
     socket.on('waiting', (_) {
-      print('Сервер: Ожидание собеседника...');
       _setState(CallState.waitingForMatch);
     });
 
-    // !!! ИСПРАВЛЕННЫЙ ОБРАБОТЧИК ДЛЯ ИЗБЕЖАНИЯ ОШИБКИ ТАЙП-КАСТИНГА !!!
     socket.on('match', (data) async {
-      print('Data: $data');
-
       try {
-        // Socket.IO клиент уже парсит JSON в Map<String, dynamic>.
-        // Мы явно приводим тип и передаем его в фабрику модели.
-
         final mapData = data as Map<String, dynamic>;
         final match = MatchData.fromJson(mapData);
 
-        print('Сервер: Собеседник найден! Партнер: ${match.partner}');
         partnerUsername = match.partner;
+
         await _connectToLiveKitRoom(match.liveKitUrl, match.token);
       } catch (e) {
-        print(
-          'Ошибка парсинга MatchData (вероятно, неверный формат данных): $e',
-        );
         _setState(CallState.error, error: 'Ошибка получения данных о комнате.');
       }
     });
-    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     socket.on('ended', (_) async {
-      print('Сервер: Собеседник завершил звонок.');
-      await _cleanUpCall();
-      // Возвращаемся в состояние "подключен", показывая сообщение
+      await _cleanUpCall(notify: true);
       _setState(CallState.connected, error: 'Собеседник завершил звонок.');
     });
   }
 
-  /// Ищет собеседника.
   void findMatch() {
     if (_state != CallState.connected) {
-      print('Нельзя начать поиск, текущее состояние: $_state');
+      showAlertWindow(
+        'Ошибка',
+        'Нельзя начать поиск, текущее состояние: $_state',
+      );
+
       return;
     }
-    final name = TelegramServiceLivekit.instance.username;
+
+    final name = TelegramService.instance.getUsername();
+
     socket.emit('find', {'userName': name});
-    // Состояние изменится на waitingForMatch после ответа от сервера
+
+    _setState(CallState.waitingForMatch);
   }
 
-  /// Завершает текущий звонок.
   Future<void> endCall() async {
     if (_state != CallState.inCall) return;
 
-    socket.emit('end'); // Уведомляем сервер, чтобы он оповестил партнера
-    await _cleanUpCall();
-    _setState(CallState.connected); // Возвращаемся в состояние ожидания
+    socket.emit('end');
+
+    await _cleanUpCall(notify: true);
+
+    _setState(CallState.connected);
   }
 
-  /// Подключается к комнате LiveKit.
+  void cancelFind() => socket.emit('cancel_find');
+
+  Future<void> setMicrophoneState() async {
+    await room.localParticipant?.setMicrophoneEnabled(
+      !room.localParticipant!.isMicrophoneEnabled(),
+    );
+
+    notifyListeners();
+  }
+
   Future<void> _connectToLiveKitRoom(String url, String token) async {
     try {
       await room.connect(
         url,
         token,
+        // ignore: deprecated_member_use
         roomOptions: const RoomOptions(adaptiveStream: true, dynacast: true),
       );
+
       await room.localParticipant?.setMicrophoneEnabled(true);
+
       _setState(CallState.inCall);
+
+      sessionTime
+        ..reset()
+        ..start();
+
+      _sessionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (sessionTime.isRunning) {
+          notifyListeners();
+        }
+      });
     } catch (e) {
-      print("LiveKit: Ошибка подключения к комнате: $e");
-      // Также уведомим сервер о разрыве, если LiveKit не подключился
       socket.emit('end');
+
       _setState(
         CallState.error,
-        error: "Не удалось подключиться к видео-комнате.",
+        error: "Не удалось подключиться к комнате: $e",
       );
     }
   }
 
-  /// Отключается от комнаты LiveKit и сбрасывает связанные данные.
   Future<void> _cleanUpCall({bool notify = true}) async {
     if (room.connectionState == ConnectionState.connected) {
       await room.disconnect();
     }
+
+    _sessionTimer?.cancel();
+    _sessionTimer = null;
+
+    sessionTime.stop();
+
     partnerUsername = null;
+
     if (notify) {
       notifyListeners();
     }
   }
 
-  /// Полностью отключается от сервера.
   @override
   void dispose() {
-    print("Disposing LivekitService");
-    socket.dispose();
+    _cleanUpCall();
+
+    if (socket.connected) {
+      socket.dispose();
+    }
+
     room.dispose();
     super.dispose();
   }

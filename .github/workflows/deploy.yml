@@ -47,6 +47,8 @@ jobs:
             
             # 2. Очищаем старую сборку (важно для чистой установки)
             find "$DEPLOY_TARGET_DIR" -mindepth 1 -delete
+
+            echo "workspace: ${{ github.workspace }}"
             
             # --- START COPY LOGIC ---
             # ИСХОДНЫЙ ПУТЬ: Упрощаем путь, убирая завершающий слэш.
@@ -72,3 +74,4 @@ jobs:
             
             # 6. Сохраняем состояние PM2 на всякий случай
             pm2 save
+

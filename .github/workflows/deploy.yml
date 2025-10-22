@@ -62,9 +62,9 @@ jobs:
             find /var/www/voxly_frontend -mindepth 1 -delete
             
             # --- START COPY LOGIC ---
-            # ПУТЬ ИЗМЕНЕН: Теперь мы копируем из папки, созданной Шагом 6.
-            # Артефакт flutter-web-build был извлечен в build-artifact.
-            BUILD_SOURCE_PATH="${{ github.workspace }}/build-artifact/web/"
+            # ИСПРАВЛЕННЫЙ ПУТЬ: Убираем '/web', так как download-artifact уже извлек
+            # содержимое папки 'web' непосредственно в 'build-artifact'.
+            BUILD_SOURCE_PATH="${{ github.workspace }}/build-artifact/"
             # Целевой путь на VPS
             DEPLOY_TARGET_PATH="/var/www/voxly_frontend"
             

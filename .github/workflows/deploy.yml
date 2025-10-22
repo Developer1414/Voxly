@@ -24,13 +24,15 @@ jobs:
           channel: 'beta'
 
       - name: 3. Получение зависимостей
+        # Запускаем pub get в папке проекта Flutter
         run: flutter pub get
         working-directory: ./voxly_frontend
 
       - name: 4. Сборка Flutter Web (Для корневого пути)
         # Убираем --base-href /Voxly/, так как вы размещаете сайт в корне домена (voxly-audio.ru/)
-        run: flutter build web --release
-        working-directory: ./voxly_frontend
+        # ЯВНО УКАЗЫВАЕМ ПУТЬ К ПРОЕКТУ FLUTTER, но не используем working-directory.
+        # Это заставит build/web создаться в корне репозитория (чтобы rsync его нашел)
+        run: flutter build web --release --project-directory ./voxly_frontend
           
       - name: 5. Развертывание на VPS Selectel по SSH
         uses: appleboy/ssh-action@v1.0.1
@@ -50,8 +52,9 @@ jobs:
             find /var/www/voxly_frontend -mindepth 1 -delete
             
             # --- START COPY LOGIC ---
-            # Путь к собранным файлам Flutter в runner'е GitHub Actions
-            BUILD_SOURCE_PATH="${{ github.workspace }}/voxly_frontend/build/web/"
+            # ПУТЬ ИЗМЕНЕН: Теперь Flutter Web будет собран в папке build/web в КОРНЕ репозитория,
+            # а не внутри voxly_frontend/. Это должно решить проблему rsync.
+            BUILD_SOURCE_PATH="${{ github.workspace }}/build/web/"
             # Целевой путь на VPS
             DEPLOY_TARGET_PATH="/var/www/voxly_frontend"
             

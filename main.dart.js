@@ -69143,7 +69143,7 @@ this.c=a
 if(b!=null)A.ayd("\u041e\u0448\u0438\u0431\u043a\u0430",b)
 this.ao()},
 jB(a){return this.mk(a,null)},
-p5(){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,c=this,b=null,a="wss://voxly-audio.ru/ws",a0="query"
+p5(){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,c=this,b=null,a="https://voxly-audio.ru",a0="query"
 if(c.c!==B.dP)return
 c.jB(B.kj)
 try{r=t.N
@@ -69151,14 +69151,14 @@ q=t.z
 p=A.u(r,q)
 p.l(0,"transports",A.b(["websocket","polling"],t.s))
 p.l(0,"autoConnect",!1)
-p.l(0,"path","/ws/socket.io/")
+p.l(0,"path","/socket.io/")
 o=A.dB(a,0,b)
 n=o.gcv()+"://"+o.gf3()+":"+o.glx()
 m=o.gcs()
 l=$.akf.V(n)&&$.akf.h(0,n).d.V(m)
 k=J.d(p.h(0,"forceNew"),!0)||J.d(p.h(0,"force new connection"),!0)||!1===p.h(0,"multiplex")||l
 j=A.cl()
-if(k){$.aCf().q(B.f,"ignoring socket cache for wss://voxly-audio.ru/ws",b,b)
+if(k){$.aCf().q(B.f,"ignoring socket cache for https://voxly-audio.ru",b,b)
 j.b=A.asF(p,a)}else{i=$.akf.h(0,n)
 if(i==null){i=A.asF(p,a)
 $.akf.l(0,n,i)}j.b=i}if(o.gj_().length!==0&&p.h(0,a0)==null)p.l(0,a0,o.gj_())

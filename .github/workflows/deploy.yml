@@ -48,13 +48,19 @@ jobs:
             # 2. Очищаем старую сборку (важно для чистой установки)
             rm -rf /var/www/voxly_frontend/*
             
+            # --- START COPY LOGIC ---
             # 3. Переходим в папку, куда будут копироваться файлы
             cd /var/www/voxly_frontend
             
             # 4. Копируем собранные файлы из папки GitHub Actions на VPS
-            # (Rsync - это мощный инструмент для передачи данных)
-            rsync -avzh ${{ github.workspace }}/voxly_frontend/build/web/ ./
+            # Убеждаемся, что исходный путь верен.
+            BUILD_PATH="${{ github.workspace }}/voxly_frontend/build/web/"
+            
+            echo "Attempting rsync from: $BUILD_PATH"
+            
+            # Выполняем rsync. Если папка пуста или не найдена, rsync не сработает.
+            rsync -avzh "$BUILD_PATH" ./
             
             # 5. Перезапускаем HTTP-сервер, который обслуживает эти файлы
-            # (Мы предположили, что вы используете PM2 для http-server на порту 8080)
+            # Теперь, когда вы установите PM2, эта команда будет работать:
             pm2 reload voxly-frontend || pm2 start http-server --name "voxly-frontend" -- /var/www/voxly_frontend -p 8080

@@ -2,9 +2,7 @@ name: Flutter Web CI/CD
 
 on:
   push:
-    branches:
-      - main
-
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
@@ -12,79 +10,41 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 1. Проверка кода (Checkout)
+      - name: 1. Checkout
         uses: actions/checkout@v4
 
-      - name: 2. Настройка Flutter SDK
+      - name: 2. Install Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'beta'
+          channel: "beta"
 
-      - name: 3. Получение зависимостей
-        # Запускаем pub get в папке проекта Flutter
+      - name: 3. Pub get
         run: flutter pub get
         working-directory: ./voxly_frontend
 
-      - name: 4. Сборка Flutter Web
-        # Возвращаем стандартную команду. Папка build/web будет создана внутри voxly_frontend.
+      - name: 4. Build web
         run: flutter build web --release
         working-directory: ./voxly_frontend
-          
-      # ШАГ 5: Сохраняем собранные файлы как артефакт
-      - name: 5. Сохранение собранных файлов (Upload Artifact)
-        uses: actions/upload-artifact@v4
-        with:
-          # Сохраняем папку, созданную Flutter: voxly_frontend/build/web
-          path: voxly_frontend/build/web
-          name: flutter-web-build
-          
-      # ШАГ 6: Загружаем артефакт в новую, чистую папку для надежного rsync
-      - name: 6. Загрузка собранных файлов (Download Artifact)
-        uses: actions/download-artifact@v4
-        with:
-          name: flutter-web-build
-          # Файлы будут извлечены в папку: build-artifact
-          path: build-artifact
 
-      # НОВЫЙ ШАГ ДЛЯ ДИАГНОСТИКИ: Вывод содержимого артефакта
-      - name: 6.5. Диагностика: Проверка пути к файлам
-        run: |
-          echo "Содержимое build-artifact:"
-          ls -R build-artifact
-          echo "Содержимое build-artifact/web:"
-          ls -R build-artifact/web
-          
-      - name: 7. Развертывание на VPS Selectel по SSH
+      - name: 5. Download build output
+        run: mkdir build-artifact && cp -r voxly_frontend/build/web/* build-artifact/
+
+      - name: 6. Upload dist via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "build-artifact/*"
+          target: "/var/www/voxly_frontend"
+
+      - name: 7. Restart app on VPS
         uses: appleboy/ssh-action@v1.0.1
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          
-          # Команда, которая выполняется на вашем VPS
           script: |
-            # 1. Создаем папку для фронтенда, если ее нет
             mkdir -p /var/www/voxly_frontend
-            
-            # 2. Очищаем старую сборку (важно для чистой установки)
-            find /var/www/voxly_frontend -mindepth 1 -delete
-            
-            # --- START COPY LOGIC ---
-            # ИСПРАВЛЕННЫЙ ПУТЬ: Убираем '/web', так как download-artifact уже извлек
-            # содержимое папки 'web' непосредственно в 'build-artifact'.
-            BUILD_SOURCE_PATH="${{ github.workspace }}/build-artifact/"
-            # Целевой путь на VPS
-            DEPLOY_TARGET_PATH="/var/www/voxly_frontend"
-            
-            echo "Attempting rsync from: $BUILD_SOURCE_PATH to $DEPLOY_TARGET_PATH"
-            
-            # 4. Копируем собранные файлы
-            # Копируем содержимое $BUILD_SOURCE_PATH в $DEPLOY_TARGET_PATH
-            rsync -avz --delete "$BUILD_SOURCE_PATH" "$DEPLOY_TARGET_PATH"
-            
-            # 5. Перезапускаем HTTP-сервер только после успешного копирования
-            echo "Restarting http-server..."
-            pm2 reload voxly-frontend || pm2 start http-server --name "voxly-frontend" -- "$DEPLOY_TARGET_PATH" -p 8080
-            
-            # 6. Сохраняем состояние PM2 на всякий случай
+            pm2 reload voxly-frontend || pm2 start http-server --name "voxly-frontend" -- /var/www/voxly_frontend -p 8080
             pm2 save

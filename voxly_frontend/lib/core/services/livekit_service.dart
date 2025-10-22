@@ -56,7 +56,7 @@ class LivekitService extends ChangeNotifier {
       socket = IO.io(
         kDebugMode
             ? 'http://localhost:3000'
-            : 'https://voxly-backend.onrender.com',
+            : 'http://212.74.226.227:3000',  //'https://voxly-backend.onrender.com',
         IO.OptionBuilder()
             .setTransports(['websocket'])
             .disableAutoConnect()

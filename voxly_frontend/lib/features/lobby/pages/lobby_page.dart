@@ -30,9 +30,7 @@ class LobbyPage extends StatelessWidget {
             ),
             CallState.connected => KeyedSubtree(
               key: const ValueKey(CallState.connected),
-              child: inCallPage(
-                livekitProvider,
-              ), // connectedPage(livekitProvider),
+              child: connectedPage(livekitProvider),
             ),
             CallState.waitingForMatch => KeyedSubtree(
               key: const ValueKey(CallState.waitingForMatch),
@@ -111,19 +109,18 @@ class LobbyPage extends StatelessWidget {
                     size: 32.0,
                   ),
                 ),
-                ButtonWidget(
-                  onTap: () async => await livekitProvider
-                      .setStartQuestion(), // await livekitProvider.changeOutputDevice(),
-                  color: speakerOn ? Colors.deepPurpleAccent : Colors.redAccent,
-                  child: Icon(
-                    livekitProvider.state != CallState.inCall
-                        ? Icons.phone_iphone_rounded
-                        : speakerOn
-                        ? Icons.speaker_phone_rounded
-                        : Icons.phone_iphone_rounded,
-                    size: 32.0,
-                  ),
-                ),
+                // ButtonWidget(
+                //   onTap: () async => await livekitProvider.changeOutputDevice(),
+                //   color: speakerOn ? Colors.deepPurpleAccent : Colors.redAccent,
+                //   child: Icon(
+                //     livekitProvider.state != CallState.inCall
+                //         ? Icons.phone_iphone_rounded
+                //         : speakerOn
+                //         ? Icons.speaker_phone_rounded
+                //         : Icons.phone_iphone_rounded,
+                //     size: 32.0,
+                //   ),
+                // ),
               ],
             ),
           ],

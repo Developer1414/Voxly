@@ -1,4 +1,4 @@
-name: Flutter Web CI/CD
+name: Flutter Web CI/CD (Только Фронтенд)
 
 on:
   push:
@@ -34,27 +34,12 @@ jobs:
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          # Содержимое папки flutter_frontend/build/web будет помещено в корень gh-pages
           publish_dir: ./voxly_frontend/build/web 
           publish_branch: gh-pages
           commit_message: "Deploying Flutter Web build via CI/CD"
           
-      # --- БЭКЕНД: ШАГ 6. КОПИРОВАНИЕ ФАЙЛОВ НА VPS через SCP ---
-      - name: 6. Копирование файлов БЭКЕНДА на VPS (/root/voxly-backend)
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          # Копируем содержимое папки voxly_backend, исключая саму папку
-          source: "./voxly_backend/*"
-          # Целевая папка на VPS
-          target: "/root/voxly-backend"
-          # Рекурсивное копирование с синхронизацией
-          overwrite: true
-          
-      # --- ШАГ 7: ДЕПЛОЙ ФРОНТЕНДА и БЭКЕНДА (SSH команды) ---
-      - name: 7. Развертывание и перезапуск на VPS (Фронтенд + Бэкенд)
+      # --- ШАГ 6: ДЕПЛОЙ ФРОНТЕНДА (SSH команды) ---
+      - name: 6. Развертывание Фронтенда и перезапуск на VPS
         uses: appleboy/ssh-action@v1.0.1
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -98,35 +83,6 @@ jobs:
             echo "Перезапуск voxly-frontend..."
             pm2 reload voxly-frontend || pm2 start http-server --name "voxly-frontend" -- "$DEPLOY_TARGET_FRONTEND" -p 8080
             
-            # =========================================================
-            # ЧАСТЬ 2: Развертывание БЭКЕНДА (Установка и перезапуск)
-            # =========================================================
-            BACKEND_TARGET_DIR="/root/voxly-backend"
-            
-            echo "Развертывание БЭКЕНДА в $BACKEND_TARGET_DIR..."
-
-            # 8. Переходим в папку бэкенда
-            cd "$BACKEND_TARGET_DIR" || { echo "ОШИБКА: Не удалось перейти в $BACKEND_TARGET_DIR. Проверьте путь и права."; exit 1; }
-
-            # 9. Установка зависимостей Node.js
-            echo "Установка зависимостей Node.js..."
-            npm install
-
-            # 10. Перезапускаем PM2-процесс бэкенда с передачей переменных окружения
-            # ВАЖНО: Все секреты должны быть добавлены в настройки GitHub Secrets
-            echo "Перезапуск voxly-backend с ENV..."
-            
-            # Строка передачи ENV-переменных PM2
-            ENV_ARGS="--env PORT=${{ secrets.PORT }} \
-              --env REDIS_URL=${{ secrets.REDIS_URL }} \
-              --env OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }} \
-              --env LIVEKIT_URL=${{ secrets.LIVEKIT_URL }} \
-              --env LIVEKIT_API_KEY=${{ secrets.LIVEKIT_API_KEY }} \
-              --env LIVEKIT_API_SECRET=${{ secrets.LIVEKIT_API_SECRET }}"
-              
-            # Команда PM2, которая использует ENV_ARGS
-            pm2 reload voxly-backend $ENV_ARGS || { echo "ОШИБКА: Не удалось перезапустить PM2 процесс 'voxly-backend'."; }
-            
-            # 11. Сохраняем состояние PM2
+            # 8. Сохраняем состояние PM2
             echo "Сохранение состояния PM2..."
             pm2 save

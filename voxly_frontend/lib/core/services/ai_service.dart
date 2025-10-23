@@ -1,5 +1,5 @@
 import 'dart:convert';
-
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class AiHintModel {
@@ -16,47 +16,39 @@ class AiService {
 
   static AiService instance = AiService._();
 
-  final url = Uri.parse('https://openrouter.ai/api/v1/chat/completions');
-
-  final String model = 'meituan/longcat-flash-chat:free';
+  final baseUrl = 'https://voxly-audio.ru';
 
   Future<AiHintModel> request(String prompt) async {
+    final url = Uri.parse('$baseUrl/generate-hint');
+
     try {
       final response = await http.post(
         url,
-        headers: {
-          'Authorization':
-              'Bearer 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',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'model': model,
-          'messages': [
-            {'role': 'user', 'content': prompt},
-          ],
-        }),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'prompt': prompt}),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
         return AiHintModel(
-          hint: data['choices'][0]['message']['content'].toString().trim(),
+          hint: data['hint'].toString().trim(),
           isSuccessfully: true,
         );
       } else {
-        print("Error ${response.statusCode}: ${response.body}");
+        final errorData = jsonDecode(response.body);
+        print("Error ${response.statusCode}: ${errorData['error']}");
 
         return AiHintModel(
-          hint: 'Не удалось сгенерировать подсказку. Повторите позже.',
+          hint: 'Ошибка генерации. Повторите позже.',
           isSuccessfully: false,
         );
       }
     } on Exception catch (e) {
-      print('Error: $e');
+      print('Network/Connection Error: $e');
 
       return AiHintModel(
-        hint: 'Не удалось сгенерировать подсказку. Повторите позже.',
+        hint: 'Нет соединения с сервером. Повторите позже.',
         isSuccessfully: false,
       );
     }

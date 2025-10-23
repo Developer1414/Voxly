@@ -30,7 +30,9 @@ class LobbyPage extends StatelessWidget {
             ),
             CallState.connected => KeyedSubtree(
               key: const ValueKey(CallState.connected),
-              child: connectedPage(livekitProvider),
+              child: inCallPage(
+                livekitProvider,
+              ), // connectedPage(livekitProvider),
             ),
             CallState.waitingForMatch => KeyedSubtree(
               key: const ValueKey(CallState.waitingForMatch),
@@ -110,7 +112,8 @@ class LobbyPage extends StatelessWidget {
                   ),
                 ),
                 ButtonWidget(
-                  onTap: () async => await livekitProvider.changeOutputDevice(),
+                  onTap: () async => await livekitProvider
+                      .setStartQuestion(), // await livekitProvider.changeOutputDevice(),
                   color: speakerOn ? Colors.deepPurpleAccent : Colors.redAccent,
                   child: Icon(
                     livekitProvider.state != CallState.inCall

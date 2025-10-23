@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart' hide ConnectionState;
+import 'package:livekit_client/livekit_client.dart';
 import 'package:provider/provider.dart';
 import 'package:voxly_frontend/core/services/livekit_service.dart';
 import 'package:voxly_frontend/core/themes/app_text_style.dart';
 import 'package:voxly_frontend/core/widgets/button_widget.dart';
+import 'package:voxly_frontend/core/themes/app_spacing.dart';
+import 'dart:ui'; // Для FontFeature
 
 class LobbyPage extends StatelessWidget {
   const LobbyPage({super.key});
@@ -14,7 +17,7 @@ class LobbyPage extends StatelessWidget {
     return Scaffold(
       body: Center(
         child: AnimatedSwitcher(
-          duration: Duration(milliseconds: 150),
+          duration: const Duration(milliseconds: 150),
           transitionBuilder: (Widget child, Animation<double> animation) {
             return FadeTransition(opacity: animation, child: child);
           },
@@ -22,19 +25,19 @@ class LobbyPage extends StatelessWidget {
             CallState.disconnected ||
             CallState.connecting ||
             CallState.error => KeyedSubtree(
-              key: ValueKey(CallState.error),
+              key: const ValueKey(CallState.error),
               child: diconnectedOrErrorPage(livekitProvider),
             ),
             CallState.connected => KeyedSubtree(
-              key: ValueKey(CallState.connected),
+              key: const ValueKey(CallState.connected),
               child: connectedPage(livekitProvider),
             ),
             CallState.waitingForMatch => KeyedSubtree(
-              key: ValueKey(CallState.waitingForMatch),
+              key: const ValueKey(CallState.waitingForMatch),
               child: waitingForMatchPage(livekitProvider),
             ),
             CallState.inCall => KeyedSubtree(
-              key: ValueKey(CallState.inCall),
+              key: const ValueKey(CallState.inCall),
               child: inCallPage(livekitProvider),
             ),
           },
@@ -44,6 +47,11 @@ class LobbyPage extends StatelessWidget {
   }
 
   Widget inCallPage(LivekitService livekitProvider) {
+    bool microphoneOn =
+        (livekitProvider.room.localParticipant?.isMicrophoneEnabled() ?? false);
+
+    bool speakerOn = (livekitProvider.room.speakerOn ?? false);
+
     String formatDuration(Duration duration) {
       String twoDigits(int n) => n.toString().padLeft(2, '0');
 
@@ -58,33 +66,149 @@ class LobbyPage extends StatelessWidget {
     }
 
     return Column(
-      spacing: 20.0,
-      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(
-          formatDuration(livekitProvider.sessionTime.elapsed),
-          style: AppTextStyles.h2Theme.copyWith(
-            fontFeatures: [FontFeature.tabularFigures()],
-          ),
-          textAlign: TextAlign.center,
-        ),
-        ButtonWidget(
-          onTap: () => livekitProvider.cancelFind(),
-          label: 'Завершить',
-        ),
-        Row(
+        Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          spacing: AppSpacing.m,
           children: [
-            ButtonWidget(
-              onTap: () async => await livekitProvider.setMicrophoneState(),
-              child: Icon(
-                livekitProvider.room.localParticipant!.isMicrophoneEnabled()
-                    ? Icons.mic_rounded
-                    : Icons.mic_off_rounded,
-                size: 30.0,
+            Padding(
+              padding: AppSpacing.allL,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    formatDuration(livekitProvider.sessionTime.elapsed),
+                    style: AppTextStyles.h2Theme.copyWith(
+                      fontFeatures: [FontFeature.tabularFigures()],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  ButtonWidget(
+                    onTap: () => livekitProvider.endCall(),
+                    padding: AppSpacing.allS,
+                    child: Icon(Icons.exit_to_app_rounded, size: 24.0),
+                  ),
+                ],
               ),
             ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              spacing: AppSpacing.m,
+              children: [
+                ButtonWidget(
+                  onTap: () async => await livekitProvider.setMicrophoneState(),
+                  color: microphoneOn
+                      ? Colors.deepPurpleAccent
+                      : Colors.redAccent,
+                  child: Icon(
+                    livekitProvider.state != CallState.inCall
+                        ? Icons.mic_off_rounded
+                        : speakerOn
+                        ? Icons.mic_rounded
+                        : Icons.mic_off_rounded,
+                    size: 32.0,
+                  ),
+                ),
+                ButtonWidget(
+                  onTap: () async => await livekitProvider.changeOutputDevice(),
+                  color: speakerOn ? Colors.deepPurpleAccent : Colors.redAccent,
+                  child: Icon(
+                    livekitProvider.state != CallState.inCall
+                        ? Icons.phone_iphone_rounded
+                        : speakerOn
+                        ? Icons.speaker_phone_rounded
+                        : Icons.phone_iphone_rounded,
+                    size: 32.0,
+                  ),
+                ),
+              ],
+            ),
           ],
+        ),
+        Expanded(child: Container()),
+        AnimatedContainer(
+          curve: Curves.easeInOutBack,
+          duration: const Duration(milliseconds: 200),
+          child: Stack(
+            children: [
+              Container(
+                width: 450.0,
+                padding: AppSpacing.allM,
+                margin: const EdgeInsets.only(
+                  left: AppSpacing.l,
+                  right: AppSpacing.l,
+                  bottom: AppSpacing.l,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(25.0),
+                  color: const Color.fromARGB(255, 91, 65, 26),
+                ),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 150),
+                  transitionBuilder:
+                      (Widget child, Animation<double> animation) {
+                        return FadeTransition(opacity: animation, child: child);
+                      },
+                  child: livekitProvider.isGeneratingStartQuestion
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          spacing: AppSpacing.m,
+                          children: [
+                            const SizedBox(
+                              width: 30.0,
+                              height: 30.0,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeCap: StrokeCap.round,
+                                strokeWidth: 5.5,
+                              ),
+                            ),
+                            Text(
+                              'Генерация ИИ подсказки...',
+                              style: AppTextStyles.h3Theme.copyWith(),
+                            ),
+                          ],
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          spacing: AppSpacing.xxs,
+                          children: [
+                            if (livekitProvider.aiHint.isSuccessfully) ...[
+                              Text(
+                                'Начните разговор с вопроса:',
+                                style: AppTextStyles.h3Theme.copyWith(
+                                  fontSize: 15.0,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
+                            Text(
+                              livekitProvider.aiHint.hint,
+                              style: AppTextStyles.h2Theme.copyWith(
+                                fontSize: 18.0,
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+              if (!livekitProvider.aiHint.isSuccessfully &&
+                  !livekitProvider.isGeneratingStartQuestion) ...[
+                Transform.translate(
+                  offset: Offset(-10.0, -20.0),
+                  child: Align(
+                    alignment: Alignment.topRight,
+                    child: ButtonWidget(
+                      onTap: () async =>
+                          await livekitProvider.setStartQuestion(),
+                      padding: EdgeInsets.all(12.0),
+                      child: Icon(Icons.replay_rounded, size: 28.0),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ],
     );
@@ -92,10 +216,10 @@ class LobbyPage extends StatelessWidget {
 
   Widget waitingForMatchPage(LivekitService livekitProvider) {
     return Column(
-      spacing: 20.0,
       mainAxisAlignment: MainAxisAlignment.center,
+      spacing: AppSpacing.m,
       children: [
-        SizedBox(
+        const SizedBox(
           width: 40.0,
           height: 40.0,
           child: CircularProgressIndicator(
@@ -110,7 +234,7 @@ class LobbyPage extends StatelessWidget {
           textAlign: TextAlign.center,
         ),
         Padding(
-          padding: const EdgeInsets.only(top: 10.0),
+          padding: const EdgeInsets.only(top: AppSpacing.xs),
           child: ButtonWidget(
             onTap: () => livekitProvider.cancelFind(),
             label: 'Отменить поиск',
@@ -122,12 +246,12 @@ class LobbyPage extends StatelessWidget {
 
   Widget diconnectedOrErrorPage(LivekitService livekitProvider) {
     return Column(
-      spacing: 10.0,
       mainAxisAlignment: MainAxisAlignment.center,
+      spacing: AppSpacing.xs,
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 10.0),
-          child: SizedBox(
+          padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+          child: const SizedBox(
             width: 40.0,
             height: 40.0,
             child: CircularProgressIndicator(
@@ -153,8 +277,8 @@ class LobbyPage extends StatelessWidget {
 
   Widget connectedPage(LivekitService livekitProvider) {
     return Column(
-      spacing: 40.0,
       mainAxisAlignment: MainAxisAlignment.center,
+      spacing: AppSpacing.xxl,
       children: [
         Column(
           children: [
@@ -171,7 +295,7 @@ class LobbyPage extends StatelessWidget {
           ],
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 25.0),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.l),
           child: SizedBox(
             width: 450.0,
             child: ButtonWidget(

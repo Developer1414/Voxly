@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:livekit_client/livekit_client.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:voxly_frontend/core/models/livekit_model.dart';
+import 'package:voxly_frontend/core/services/ai_service.dart';
 import 'package:voxly_frontend/core/services/telegram_service.dart';
 import 'package:voxly_frontend/core/widgets/alert_window.dart';
 
@@ -27,12 +29,15 @@ class LivekitService extends ChangeNotifier {
 
   String? _errorMessage;
   String? get errorMessage => _errorMessage;
-
   String? partnerUsername;
+
+  AiHintModel aiHint = AiHintModel.init();
 
   Stopwatch sessionTime = Stopwatch();
 
   Timer? _sessionTimer;
+
+  bool isGeneratingStartQuestion = true;
 
   void _setState(CallState newState, {String? error}) {
     if (_state == newState && error == null) return;
@@ -73,6 +78,18 @@ class LivekitService extends ChangeNotifier {
         error: 'Не удалось инициализировать сокет: $e',
       );
     }
+  }
+
+  Future setStartQuestion() async {
+    isGeneratingStartQuestion = true;
+    notifyListeners();
+
+    aiHint = await AiService.instance.request(
+      """Пожалуйста, сгенерируй один, максимально простой и "зумерский" вопрос, идеально подходящий для начала разговора с незнакомцем в анонимном голосовом чате. Вопрос должен быть легким, не требовать глубоких размышлений и мгновенно создавать непринужденную атмосферу. В ответе предоставь только сам вопрос, без лишнего текста и объяснений.""",
+    );
+
+    isGeneratingStartQuestion = false;
+    notifyListeners();
   }
 
   void _registerSocketEvents() {
@@ -142,14 +159,32 @@ class LivekitService extends ChangeNotifier {
     _setState(CallState.waitingForMatch);
   }
 
-  Future<void> endCall() async {
-    if (_state != CallState.inCall) return;
+  void endCall() {
+    //if (_state != CallState.inCall) return;
 
-    socket.emit('end');
+    showAlertWindow(
+      'Подтверждение',
+      'Вы действительно хотите выйти из звонка?',
+      alertButtons: [
+        AlertButton(
+          label: 'Да',
+          color: Colors.redAccent,
+          onTap: () async {
+            socket.emit('end');
 
-    await _cleanUpCall(notify: true);
+            await _cleanUpCall(notify: true);
 
-    _setState(CallState.connected);
+            _setState(CallState.connected);
+          },
+        ),
+        AlertButton(
+          label: 'Нет',
+          color: Colors.green,
+          onTap: () {},
+          isCloseAlert: true,
+        ),
+      ],
+    );
   }
 
   void cancelFind() => socket.emit('cancel_find');
@@ -158,6 +193,12 @@ class LivekitService extends ChangeNotifier {
     await room.localParticipant?.setMicrophoneEnabled(
       !room.localParticipant!.isMicrophoneEnabled(),
     );
+
+    notifyListeners();
+  }
+
+  Future<void> changeOutputDevice() async {
+    await room.setSpeakerOn(!room.speakerOn!);
 
     notifyListeners();
   }

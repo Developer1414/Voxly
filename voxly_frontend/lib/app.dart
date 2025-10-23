@@ -25,6 +25,7 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      title: 'Voxly — Audio Chat',
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark(),

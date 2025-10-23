@@ -160,7 +160,7 @@ class LivekitService extends ChangeNotifier {
   }
 
   void endCall() {
-    //if (_state != CallState.inCall) return;
+    if (_state != CallState.inCall) return;
 
     showAlertWindow(
       'Подтверждение',
@@ -169,6 +169,7 @@ class LivekitService extends ChangeNotifier {
         AlertButton(
           label: 'Да',
           color: Colors.redAccent,
+          isCloseAlert: true,
           onTap: () async {
             socket.emit('end');
 
@@ -225,6 +226,8 @@ class LivekitService extends ChangeNotifier {
           notifyListeners();
         }
       });
+
+      await setStartQuestion();
     } catch (e) {
       socket.emit('end');
 

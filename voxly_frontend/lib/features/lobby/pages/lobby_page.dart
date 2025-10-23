@@ -103,7 +103,7 @@ class LobbyPage extends StatelessWidget {
                   child: Icon(
                     livekitProvider.state != CallState.inCall
                         ? Icons.mic_off_rounded
-                        : speakerOn
+                        : microphoneOn
                         ? Icons.mic_rounded
                         : Icons.mic_off_rounded,
                     size: 32.0,

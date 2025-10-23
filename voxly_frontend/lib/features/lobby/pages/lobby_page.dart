@@ -30,9 +30,7 @@ class LobbyPage extends StatelessWidget {
             ),
             CallState.connected => KeyedSubtree(
               key: const ValueKey(CallState.connected),
-              child: inCallPage(
-                livekitProvider,
-              ), // connectedPage(livekitProvider),
+              child: connectedPage(livekitProvider),
             ),
             CallState.waitingForMatch => KeyedSubtree(
               key: const ValueKey(CallState.waitingForMatch),

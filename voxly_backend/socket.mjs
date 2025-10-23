@@ -1,4 +1,4 @@
-import redisClient from "./redisClient.js";
+import redisClient from "./redisClient.mjs";
 import {
   createToken,
   cleanupUserSession,
@@ -7,8 +7,8 @@ import {
   USER_DATA_PREFIX,
   ROOM_DATA_PREFIX,
   USER_ROOM_PREFIX,
-} from "./utils.js";
-import { LIVEKIT_URL } from "./config.js";
+} from "./utils.mjs";
+import { LIVEKIT_URL } from "./config.mjs";
 
 async function handleFindMatch(socket, data, io) {
   try {

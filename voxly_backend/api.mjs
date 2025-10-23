@@ -1,5 +1,5 @@
 import express from "express";
-import { OPENROUTER_API_KEY } from "./config.js";
+import { OPENROUTER_API_KEY } from "./config.mjs";
 
 const apiRouter = express.Router();
 

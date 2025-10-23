@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart' hide ConnectionState;
-import 'package:livekit_client/livekit_client.dart';
 import 'package:provider/provider.dart';
 import 'package:voxly_frontend/core/services/livekit_service.dart';
 import 'package:voxly_frontend/core/themes/app_text_style.dart';
 import 'package:voxly_frontend/core/widgets/button_widget.dart';
 import 'package:voxly_frontend/core/themes/app_spacing.dart';
-import 'dart:ui'; // Для FontFeature
 
 class LobbyPage extends StatelessWidget {
   const LobbyPage({super.key});
@@ -50,7 +48,7 @@ class LobbyPage extends StatelessWidget {
     bool microphoneOn =
         (livekitProvider.room.localParticipant?.isMicrophoneEnabled() ?? false);
 
-    bool speakerOn = (livekitProvider.room.speakerOn ?? false);
+    //bool speakerOn = (livekitProvider.room.speakerOn ?? false);
 
     String formatDuration(Duration duration) {
       String twoDigits(int n) => n.toString().padLeft(2, '0');

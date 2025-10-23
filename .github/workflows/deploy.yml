@@ -1,4 +1,4 @@
-name: Flutter Web CI/CD
+name: Flutter Web CI/CD (Только Фронтенд)
 
 on:
   push:
@@ -10,30 +10,79 @@ on:
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
       - name: 1. Проверка кода (Checkout)
         uses: actions/checkout@v4
 
+      # --- ФРОНТЕНД: СБОРКА Flutter Web ---
       - name: 2. Настройка Flutter SDK
         uses: subosito/flutter-action@v2
         with:
           channel: 'beta'
 
-      - name: 3. Получение зависимостей
+      - name: 3. Получение зависимостей (Фронтенд)
         run: flutter pub get
         working-directory: ./voxly_frontend
 
       - name: 4. Сборка Flutter Web
-        run: |
-            flutter build web --release --base-href /Voxly/
+        run: flutter build web --release
         working-directory: ./voxly_frontend
           
-      - name: 5. Развертывание на GitHub Pages
+      # --- ШАГ 5: ДЕПЛОЙ ФРОНТЕНДА (Публикация в GH-PAGES) ---
+      - name: 5. Публикация веб-сборки в ветку gh-pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./voxly_frontend/build/web
+          publish_dir: ./voxly_frontend/build/web 
           publish_branch: gh-pages
+          commit_message: "Deploying Flutter Web build via CI/CD"
+          
+      # --- ШАГ 6: ДЕПЛОЙ ФРОНТЕНДА (SSH команды) ---
+      - name: 6. Развертывание Фронтенда и перезапуск на VPS
+        uses: appleboy/ssh-action@v1.0.1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          
+          # Команда, которая выполняется на вашем VPS
+          script: |
+            # =========================================================
+            # ЧАСТЬ 1: Развертывание ФРОНТЕНДА (Скачивание из gh-pages)
+            # =========================================================
+            REPO_NAME="${{ github.repository }}"
+            DEPLOY_TARGET_FRONTEND="/var/www/voxly_frontend"
+            TEMP_ARCHIVE="/tmp/gh-pages-build.zip"
+            TEMP_DIR="/tmp/gh-pages-content"
+            DOWNLOAD_URL="https://api.github.com/repos/$REPO_NAME/zipball/gh-pages"
+
+            echo "Скачивание и развертывание ФРОНТЕНДА..."
+
+            # 1. Скачиваем ZIP-архив ветки gh-pages
+            wget -q -O "$TEMP_ARCHIVE" "$DOWNLOAD_URL"
+            
+            # 2. Распаковываем архив во временную папку
+            mkdir -p "$TEMP_DIR"
+            unzip -q -o "$TEMP_ARCHIVE" -d "$TEMP_DIR"
+            
+            # 3. Находим корневую папку с файлами внутри архива
+            BUILD_FOLDER=$(find "$TEMP_DIR" -mindepth 1 -maxdepth 1 -type d | head -n 1)
+            
+            # 4. Очищаем целевую папку фронтенда и создаем ее, если нет
+            mkdir -p "$DEPLOY_TARGET_FRONTEND"
+            find "$DEPLOY_TARGET_FRONTEND" -mindepth 1 -delete
+            
+            # 5. Копируем файлы фронтенда
+            cp -r "$BUILD_FOLDER"/* "$DEPLOY_TARGET_FRONTEND"/
+
+            # 6. Уборка
+            rm -rf "$TEMP_DIR" "$TEMP_ARCHIVE"
+
+            # 7. Перезапускаем HTTP-сервер фронтенда
+            echo "Перезапуск voxly-frontend..."
+            pm2 reload voxly-frontend || pm2 start http-server --name "voxly-frontend" -- "$DEPLOY_TARGET_FRONTEND" -p 8080
+            
+            # 8. Сохраняем состояние PM2
+            echo "Сохранение состояния PM2..."
+            pm2 save

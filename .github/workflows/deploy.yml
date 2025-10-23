@@ -85,50 +85,51 @@ jobs:
             pm2 reload voxly-frontend || pm2 start http-server --name "voxly-frontend" -- "$DEPLOY_TARGET_FRONTEND" -p 8080
             
             # =========================================================
-            # ЧАСТЬ 2: Развертывание БЭКЕНДА (Копирование из главного репо)
+            # ЧАСТЬ 2: Развертывание БЭКЕНДА (Обновление из главного репо)
             # =========================================================
             
-            BACKEND_SOURCE_DIR="${{ github.workspace }}/voxly_backend" # Это путь на GitHub Actions Runner!
             BACKEND_TARGET_DIR="/root/voxly-backend" # Целевая папка на VPS
             
-            echo "Развертывание БЭКЕНДА..."
+            echo "Развертывание БЭКЕНДА в $BACKEND_TARGET_DIR..."
 
-            # 8. Создаем целевую папку и очищаем старые файлы
-            mkdir -p "$BACKEND_TARGET_DIR"
-            
-            # 9. Клонирование/Обновление: Вместо сложной логики копируем весь репозиторий на VPS,
-            #    чтобы получить папку voxly_backend. Это самый простой способ,
-            #    если у вас нет отдельного репозитория для бэкенда.
-            
-            # ВНИМАНИЕ: Для упрощения процесса, мы будем копировать файлы бэкенда 
-            # через SCP. Однако, так как appleboy/ssh-action не поддерживает SCP
-            # внутри одного шага, мы используем команду git clone, чтобы получить
-            # свежие файлы бэкенда на VPS.
-            
-            # ИСПОЛЬЗУЕМ GIT CLONE НА VPS, чтобы получить свежий код бэкенда:
+            # Проверка наличия git
+            if ! command -v git &> /dev/null; then
+              echo "ОШИБКА: Команда 'git' не найдена на VPS. Пожалуйста, установите git."
+              exit 1 # Завершаемся, если git не установлен
+            fi
+
             REPO_URL="https://github.com/${{ github.repository }}.git"
             
-            # Если папки еще нет, клонируем
+            # 8. Создаем целевую папку, если ее нет
+            mkdir -p "$BACKEND_TARGET_DIR"
+
+            # 9. Клонирование/Обновление
             if [ ! -d "$BACKEND_TARGET_DIR/.git" ]; then
+              # Если папки .git нет, клонируем
               echo "Клонирование репозитория в $BACKEND_TARGET_DIR"
-              git clone "$REPO_URL" "$BACKEND_TARGET_DIR"
+              git clone "$REPO_URL" "$BACKEND_TARGET_DIR" || { echo "ОШИБКА КЛОНИРОВАНИЯ. Проверьте права доступа."; exit 1; }
+              # Переходим в папку для дальнейших операций
               cd "$BACKEND_TARGET_DIR"
-              git checkout main
             else
-              # Иначе просто обновляем (pull)
+              # Иначе обновляем: переходим в папку, сбрасываем локальные изменения и тянем последние файлы
               echo "Обновление репозитория в $BACKEND_TARGET_DIR"
-              cd "$BACKEND_TARGET_DIR"
-              git pull origin main
+              # Переходим в папку. Если cd не удался, выводим ошибку и завершаем
+              cd "$BACKEND_TARGET_DIR" || { echo "ОШИБКА: Не удалось перейти в $BACKEND_TARGET_DIR. Проверьте права."; exit 1; }
+              
+              # Сбрасываем изменения, чтобы гарантировать чистое обновление (игнорирует .env)
+              git reset --hard origin/main
+              
+              # Обновляем (pull)
+              git pull origin main || { echo "ОШИБКА GIT PULL. Проверьте ветку/права."; exit 1; }
             fi
             
-            # 10. Установка зависимостей Node.js
+            # 10. Установка зависимостей Node.js (происходит внутри $BACKEND_TARGET_DIR)
             echo "Установка зависимостей Node.js..."
-            npm install --prefix "$BACKEND_TARGET_DIR" 
+            npm install
             
-            # 11. Перезапускаем PM2-процесс бэкенда (процесс 'voxly-ba' или 'voxly-backend')
-            # Используем имя процесса, которое вы используете в PM2 (например, voxly-ba)
+            # 11. Перезапускаем PM2-процесс бэкенда
             echo "Перезапуск voxly-backend..."
-            pm2 reload voxly-backend 
+            pm2 reload voxly-backend || { echo "ОШИБКА: Не удалось перезапустить PM2 процесс 'voxly-backend'."; }
             
             # 12. Сохраняем состояние PM2
             echo "Сохранение состояния PM2..."

@@ -26,7 +26,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          # Копируем содержимое папки voxly_backend, исключая саму папку
+          # Копируем содержимое папки voxly_backend, используя маску
           source: "./voxly_backend/*"
           # Целевая папка на VPS
           target: "/root/voxly-backend"
@@ -46,7 +46,13 @@ jobs:
             BACKEND_TARGET_DIR="/root/voxly-backend"
             
             echo "Развертывание БЭКЕНДА в $BACKEND_TARGET_DIR..."
-
+            
+            # 0. АВАРИЙНАЯ ОЧИСТКА: Удаляем нежелательные вложенные папки,
+            # которые могли быть ошибочно скопированы с прошлого раза.
+            echo "Аварийная очистка вложенных папок..."
+            rm -rf "$BACKEND_TARGET_DIR/voxly_backend"
+            rm -rf "$BACKEND_TARGET_DIR/voxly_frontend"
+            
             # 1. Переходим в папку бэкенда
             cd "$BACKEND_TARGET_DIR" || { echo "ОШИБКА: Не удалось перейти в $BACKEND_TARGET_DIR. Проверьте путь и права."; exit 1; }
 
@@ -66,7 +72,6 @@ jobs:
               --env LIVEKIT_API_SECRET=${{ secrets.LIVEKIT_API_SECRET }}"
               
             # Команда PM2, которая использует ENV_ARGS
-            # FIX: Используем server.mjs и --interpreter node для поддержки ES Modules
             pm2 reload voxly-backend --interpreter node -- start server.mjs $ENV_ARGS || { echo "ОШИБКА: Не удалось перезапустить PM2 процесс 'voxly-backend'."; }
             
             # 4. Сохраняем состояние PM2

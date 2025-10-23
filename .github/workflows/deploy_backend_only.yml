@@ -18,7 +18,7 @@ jobs:
       - name: 1. Проверка кода (Checkout)
         uses: actions/checkout@v4
 
-      # --- НОВЫЙ ШАГ: Принудительная очистка целевой папки ---
+      # --- ШАГ 2: Принудительная очистка целевой папки ---
       - name: 2. Принудительная очистка целевой папки на VPS
         uses: appleboy/ssh-action@v1.0.1
         with:
@@ -33,13 +33,15 @@ jobs:
             rm -rf "$BACKEND_TARGET_DIR"/.* || true
 
       # --- ШАГ 3. КОПИРОВАНИЕ ФАЙЛОВ НА VPS через SCP ---
+      # ИЗМЕНЕНО: Копируем всю папку voxly_backend, а не ее содержимое.
+      # На VPS это создаст структуру: /root/voxly-backend/voxly_backend/...
       - name: 3. Копирование файлов БЭКЕНДА на VPS (/root/voxly-backend)
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "./voxly_backend/*"
+          source: "./voxly_backend" # ИЗМЕНЕНО: Убрана маска /*
           target: "/root/voxly-backend"
           overwrite: true
           
@@ -56,8 +58,17 @@ jobs:
             
             echo "Развертывание БЭКЕНДА в $BACKEND_TARGET_DIR..."
             
-            echo "Аварийная очистка вложенных папок..."
+            # НОВЫЕ КОМАНДЫ: Перемещаем содержимое из вложенной папки на уровень выше
+            echo "Перемещение файлов из вложенной папки..."
+            # Копируем содержимое voxly_backend/* в текущую папку
+            mv "$BACKEND_TARGET_DIR/voxly_backend/"* "$BACKEND_TARGET_DIR"
+            # Перемещаем скрытые файлы (например, .env)
+            mv "$BACKEND_TARGET_DIR/voxly_backend/".* "$BACKEND_TARGET_DIR" || true
+            # Удаляем теперь пустую вложенную папку
             rm -rf "$BACKEND_TARGET_DIR/voxly_backend"
+
+
+            echo "Аварийная очистка вложенных папок..."
             rm -rf "$BACKEND_TARGET_DIR/voxly_frontend"
             
             cd "$BACKEND_TARGET_DIR" || { echo "ОШИБКА: Не удалось перейти в $BACKEND_TARGET_DIR. Проверьте путь и права."; exit 1; }

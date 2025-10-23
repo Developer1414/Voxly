@@ -49,6 +49,7 @@ class LobbyPage extends StatelessWidget {
         (livekitProvider.room.localParticipant?.isMicrophoneEnabled() ?? false);
 
     //bool speakerOn = (livekitProvider.room.speakerOn ?? false);
+    //test
 
     String formatDuration(Duration duration) {
       String twoDigits(int n) => n.toString().padLeft(2, '0');

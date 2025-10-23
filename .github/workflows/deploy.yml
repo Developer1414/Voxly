@@ -14,37 +14,32 @@ jobs:
     steps:
       - name: 1. Проверка кода (Checkout)
         uses: actions/checkout@v4
+        # ВАЖНО: При checkout вся структура репозитория скачивается в папку runner'а.
 
       - name: 2. Настройка Flutter SDK
         uses: subosito/flutter-action@v2
         with:
           channel: 'beta'
 
-      - name: 3. Получение зависимостей
-        # Запускаем pub get в папке проекта Flutter
+      - name: 3. Получение зависимостей (Фронтенд)
         run: flutter pub get
         working-directory: ./voxly_frontend
 
       - name: 4. Сборка Flutter Web
-        # Папка build/web будет создана внутри voxly_frontend.
         run: flutter build web --release
         working-directory: ./voxly_frontend
           
-      # --- НОВЫЙ ШАГ: ПУБЛИКАЦИЯ В ВЕТКУ GH-PAGES ---
+      # --- ШАГ 5: ПУБЛИКАЦИЯ В ВЕТКУ GH-PAGES (Фронтенд) ---
       - name: 5. Публикация веб-сборки в ветку gh-pages
         uses: peaceiris/actions-gh-pages@v3
         with:
-          # Убедитесь, что у вашего репозитория включено право записи (Permissions > Actions > General > Read and write permissions)
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          # Содержимое папки flutter_frontend/build/web будет помещено в корень gh-pages
           publish_dir: ./voxly_frontend/build/web 
-          # Публикуем в ветку gh-pages
           publish_branch: gh-pages
-          # Используем простое сообщение коммита
           commit_message: "Deploying Flutter Web build via CI/CD"
-        
-      # --- ОБНОВЛЕННЫЙ ШАГ: СКАЧИВАНИЕ ИЗ GH-PAGES НА VPS ---
-      - name: 6. Развертывание на VPS Selectel (Скачивание с gh-pages)
+          
+      # --- ШАГ 6: РАЗВЕРТЫВАНИЕ НА VPS SELECTEL (Фронтенд + Бэкенд) ---
+      - name: 6. Развертывание на VPS Selectel (Фронтенд и Бэкенд)
         uses: appleboy/ssh-action@v1.0.1
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -53,44 +48,88 @@ jobs:
           
           # Команда, которая выполняется на вашем VPS
           script: |
-            # 1. Определяем переменные
+            # =========================================================
+            # ЧАСТЬ 1: Развертывание ФРОНТЕНДА (Скачивание из gh-pages)
+            # =========================================================
+            
             REPO_NAME="${{ github.repository }}"
-            DEPLOY_TARGET_DIR="/var/www/voxly_frontend"
+            DEPLOY_TARGET_FRONTEND="/var/www/voxly_frontend" # Целевая папка для фронтенда
             TEMP_ARCHIVE="/tmp/gh-pages-build.zip"
             TEMP_DIR="/tmp/gh-pages-content"
-            
-            # URL для скачивания ZIP-архива ветки gh-pages
-            # Формат: https://api.github.com/repos/{owner}/{repo}/zipball/{branch}
             DOWNLOAD_URL="https://api.github.com/repos/$REPO_NAME/zipball/gh-pages"
 
-            echo "Скачивание артефакта из $DOWNLOAD_URL"
+            echo "Скачивание и развертывание ФРОНТЕНДА..."
 
-            # 2. Скачиваем ZIP-архив с GitHub API (требует установленного wget на VPS)
-            # Необходимо установить wget и unzip на VPS
+            # 1. Скачиваем ZIP-архив ветки gh-pages
             wget -q -O "$TEMP_ARCHIVE" "$DOWNLOAD_URL"
             
-            # 3. Распаковываем архив во временную папку
+            # 2. Распаковываем архив во временную папку
             mkdir -p "$TEMP_DIR"
             unzip -q -o "$TEMP_ARCHIVE" -d "$TEMP_DIR"
             
-            # 4. Находим корневую папку с файлами внутри архива (она имеет случайное имя)
-            # Ищем папку, которая не является системной (. или ..)
+            # 3. Находим корневую папку с файлами внутри архива (имеет случайное имя)
             BUILD_FOLDER=$(find "$TEMP_DIR" -mindepth 1 -maxdepth 1 -type d | head -n 1)
             
-            # 5. Очищаем целевую папку на VPS
-            mkdir -p "$DEPLOY_TARGET_DIR"
-            find "$DEPLOY_TARGET_DIR" -mindepth 1 -delete
+            # 4. Очищаем целевую папку фронтенда
+            mkdir -p "$DEPLOY_TARGET_FRONTEND"
+            find "$DEPLOY_TARGET_FRONTEND" -mindepth 1 -delete
             
-            # 6. Копируем файлы из временной папки в целевую
-            # Копируем СОДЕРЖИМОЕ $BUILD_FOLDER в $DEPLOY_TARGET_DIR
-            cp -r "$BUILD_FOLDER"/* "$DEPLOY_TARGET_DIR"/
+            # 5. Копируем файлы фронтенда
+            cp -r "$BUILD_FOLDER"/* "$DEPLOY_TARGET_FRONTEND"/
 
-            # 7. Уборка
+            # 6. Уборка
             rm -rf "$TEMP_DIR" "$TEMP_ARCHIVE"
 
-            # 8. Перезапускаем HTTP-сервер 
-            echo "Restarting http-server..."
-            pm2 reload voxly-frontend || pm2 start http-server --name "voxly-frontend" -- "$DEPLOY_TARGET_DIR" -p 8080
+            # 7. Перезапускаем HTTP-сервер фронтенда
+            echo "Перезапуск voxly-frontend..."
+            pm2 reload voxly-frontend || pm2 start http-server --name "voxly-frontend" -- "$DEPLOY_TARGET_FRONTEND" -p 8080
             
-            # 9. Сохраняем состояние PM2 
+            # =========================================================
+            # ЧАСТЬ 2: Развертывание БЭКЕНДА (Копирование из главного репо)
+            # =========================================================
+            
+            BACKEND_SOURCE_DIR="${{ github.workspace }}/voxly_backend" # Это путь на GitHub Actions Runner!
+            BACKEND_TARGET_DIR="/root/voxly-backend" # Целевая папка на VPS
+            
+            echo "Развертывание БЭКЕНДА..."
+
+            # 8. Создаем целевую папку и очищаем старые файлы
+            mkdir -p "$BACKEND_TARGET_DIR"
+            
+            # 9. Клонирование/Обновление: Вместо сложной логики копируем весь репозиторий на VPS,
+            #    чтобы получить папку voxly_backend. Это самый простой способ,
+            #    если у вас нет отдельного репозитория для бэкенда.
+            
+            # ВНИМАНИЕ: Для упрощения процесса, мы будем копировать файлы бэкенда 
+            # через SCP. Однако, так как appleboy/ssh-action не поддерживает SCP
+            # внутри одного шага, мы используем команду git clone, чтобы получить
+            # свежие файлы бэкенда на VPS.
+            
+            # ИСПОЛЬЗУЕМ GIT CLONE НА VPS, чтобы получить свежий код бэкенда:
+            REPO_URL="https://github.com/${{ github.repository }}.git"
+            
+            # Если папки еще нет, клонируем
+            if [ ! -d "$BACKEND_TARGET_DIR/.git" ]; then
+              echo "Клонирование репозитория в $BACKEND_TARGET_DIR"
+              git clone "$REPO_URL" "$BACKEND_TARGET_DIR"
+              cd "$BACKEND_TARGET_DIR"
+              git checkout main
+            else
+              # Иначе просто обновляем (pull)
+              echo "Обновление репозитория в $BACKEND_TARGET_DIR"
+              cd "$BACKEND_TARGET_DIR"
+              git pull origin main
+            fi
+            
+            # 10. Установка зависимостей Node.js
+            echo "Установка зависимостей Node.js..."
+            npm install --prefix "$BACKEND_TARGET_DIR" 
+            
+            # 11. Перезапускаем PM2-процесс бэкенда (процесс 'voxly-ba' или 'voxly-backend')
+            # Используем имя процесса, которое вы используете в PM2 (например, voxly-ba)
+            echo "Перезапуск voxly-backend..."
+            pm2 reload voxly-backend 
+            
+            # 12. Сохраняем состояние PM2
+            echo "Сохранение состояния PM2..."
             pm2 save

@@ -37,7 +37,10 @@ class AiService {
         );
       } else {
         final errorData = jsonDecode(response.body);
-        print("Error ${response.statusCode}: ${errorData['error']}");
+
+        if (kDebugMode) {
+          print("Error ${response.statusCode}: ${errorData['error']}");
+        }
 
         return AiHintModel(
           hint: 'Ошибка генерации. Повторите позже.',
@@ -45,7 +48,9 @@ class AiService {
         );
       }
     } on Exception catch (e) {
-      print('Network/Connection Error: $e');
+      if (kDebugMode) {
+        print('Network/Connection Error: $e');
+      }
 
       return AiHintModel(
         hint: 'Нет соединения с сервером. Повторите позже.',

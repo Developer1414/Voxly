@@ -1,7 +1,7 @@
 import { AccessToken } from "livekit-server-sdk";
 import crypto from "crypto";
-import redisClient from "./redisClient.js";
-import { LIVEKIT_API_KEY, LIVEKIT_API_SECRET } from "./config.js";
+import redisClient from "./redisClient.mjs";
+import { LIVEKIT_API_KEY, LIVEKIT_API_SECRET } from "./config.mjs";
 
 export const WAITING_USERS_KEY = "waiting_users";
 export const USER_DATA_PREFIX = "user:";

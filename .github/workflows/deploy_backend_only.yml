@@ -34,7 +34,7 @@ jobs:
           overwrite: true
           
       # --- ШАГ 3: УСТАНОВКА и ПЕРЕЗАПУСК БЭКЕНДА (SSH команды) ---
-      - name: 3. Установка зависимостей и ПЕРЕЗАПУСК на VPS
+      - name: 3. Установка зависимостей и перезапуск на VPS
         uses: appleboy/ssh-action@v1.0.1
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -53,7 +53,7 @@ jobs:
             # 2. Установка зависимостей Node.js
             echo "Установка зависимостей Node.js..."
             npm install
-
+            
             # 3. Перезапускаем PM2-процесс бэкенда с передачей переменных окружения
             echo "Перезапуск voxly-backend с ENV..."
             
@@ -65,12 +65,9 @@ jobs:
               --env LIVEKIT_API_KEY=${{ secrets.LIVEKIT_API_KEY }} \
               --env LIVEKIT_API_SECRET=${{ secrets.LIVEKIT_API_SECRET }}"
               
-            # Удаляем процесс, чтобы гарантировать применение новых ENV
-            # (Используем || true, чтобы скрипт не упал, если процесс еще не запущен)
-            pm2 delete voxly-backend || true
-            
-            # Запускаем процесс заново с новыми ENV, указывая основной файл (server.mjs)
-            pm2 start server.mjs --name voxly-backend $ENV_ARGS || { echo "ОШИБКА: Не удалось запустить PM2 процесс 'voxly-backend'."; exit 1; }
+            # Команда PM2, которая использует ENV_ARGS
+            # FIX: Используем server.mjs и --interpreter node для поддержки ES Modules
+            pm2 reload voxly-backend --interpreter node -- start server.mjs $ENV_ARGS || { echo "ОШИБКА: Не удалось перезапустить PM2 процесс 'voxly-backend'."; }
             
             # 4. Сохраняем состояние PM2
             echo "Сохранение состояния PM2..."

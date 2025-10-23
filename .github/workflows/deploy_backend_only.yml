@@ -53,7 +53,7 @@ jobs:
             # 2. Установка зависимостей Node.js
             echo "Установка зависимостей Node.js..."
             npm install
-
+            
             # 3. Перезапускаем PM2-процесс бэкенда с передачей переменных окружения
             echo "Перезапуск voxly-backend с ENV..."
             
@@ -66,7 +66,8 @@ jobs:
               --env LIVEKIT_API_SECRET=${{ secrets.LIVEKIT_API_SECRET }}"
               
             # Команда PM2, которая использует ENV_ARGS
-            pm2 reload voxly-backend $ENV_ARGS || { echo "ОШИБКА: Не удалось перезапустить PM2 процесс 'voxly-backend'."; }
+            # FIX: Используем server.mjs и --interpreter node для поддержки ES Modules
+            pm2 reload voxly-backend --interpreter node -- start server.mjs $ENV_ARGS || { echo "ОШИБКА: Не удалось перезапустить PM2 процесс 'voxly-backend'."; }
             
             # 4. Сохраняем состояние PM2
             echo "Сохранение состояния PM2..."

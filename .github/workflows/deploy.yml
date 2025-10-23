@@ -15,6 +15,7 @@ jobs:
       - name: 1. Проверка кода (Checkout)
         uses: actions/checkout@v4
         # ВАЖНО: При checkout вся структура репозитория скачивается в папку runner'а.
+        # Теперь папка 'voxly_backend' доступна для SCP.
 
       - name: 2. Настройка Flutter SDK
         uses: subosito/flutter-action@v2
@@ -38,98 +39,73 @@ jobs:
           publish_branch: gh-pages
           commit_message: "Deploying Flutter Web build via CI/CD"
           
-      # --- ШАГ 6: РАЗВЕРТЫВАНИЕ НА VPS SELECTEL (Фронтенд + Бэкенд) ---
-      - name: 6. Развертывание на VPS Selectel (Фронтенд и Бэкенд)
+      # --- ШАГ 6 (НОВЫЙ): КОПИРОВАНИЕ БЭКЕНДА через SCP ---
+      - name: 6. Копирование файлов бэкенда на VPS (SCP)
+        uses: appleboy/scp-action@v0.1.7 # Используем отдельный экшен для копирования
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          # Source - откуда копировать на раннере (папка бэкенда)
+          source: "./voxly_backend/*"
+          # Target - куда копировать на VPS (корень бэкенда)
+          target: "/root/voxly-backend"
+          # Создаем целевую папку, если ее нет
+          strip_components: 1 # Убираем корневую папку voxly_backend, копируем только содержимое
+          
+      # --- ШАГ 7 (ОБНОВЛЕННЫЙ): РАЗВЕРТЫВАНИЕ И ПЕРЕЗАПУСК (Фронтенд + Бэкенд) ---
+      - name: 7. Завершение развертывания на VPS (SSH)
         uses: appleboy/ssh-action@v1.0.1
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           
-          # Команда, которая выполняется на вашем VPS
           script: |
             # =========================================================
             # ЧАСТЬ 1: Развертывание ФРОНТЕНДА (Скачивание из gh-pages)
+            # Мы оставили эту часть тут, так как она не зависит от локальных файлов
             # =========================================================
             
             REPO_NAME="${{ github.repository }}"
-            DEPLOY_TARGET_FRONTEND="/var/www/voxly_frontend" # Целевая папка для фронтенда
+            DEPLOY_TARGET_FRONTEND="/var/www/voxly_frontend"
             TEMP_ARCHIVE="/tmp/gh-pages-build.zip"
             TEMP_DIR="/tmp/gh-pages-content"
             DOWNLOAD_URL="https://api.github.com/repos/$REPO_NAME/zipball/gh-pages"
 
             echo "Скачивание и развертывание ФРОНТЕНДА..."
 
-            # 1. Скачиваем ZIP-архив ветки gh-pages
             wget -q -O "$TEMP_ARCHIVE" "$DOWNLOAD_URL"
-            
-            # 2. Распаковываем архив во временную папку
             mkdir -p "$TEMP_DIR"
             unzip -q -o "$TEMP_ARCHIVE" -d "$TEMP_DIR"
-            
-            # 3. Находим корневую папку с файлами внутри архива (имеет случайное имя)
             BUILD_FOLDER=$(find "$TEMP_DIR" -mindepth 1 -maxdepth 1 -type d | head -n 1)
-            
-            # 4. Очищаем целевую папку фронтенда
             mkdir -p "$DEPLOY_TARGET_FRONTEND"
             find "$DEPLOY_TARGET_FRONTEND" -mindepth 1 -delete
-            
-            # 5. Копируем файлы фронтенда
             cp -r "$BUILD_FOLDER"/* "$DEPLOY_TARGET_FRONTEND"/
-
-            # 6. Уборка
             rm -rf "$TEMP_DIR" "$TEMP_ARCHIVE"
 
-            # 7. Перезапускаем HTTP-сервер фронтенда
             echo "Перезапуск voxly-frontend..."
             pm2 reload voxly-frontend || pm2 start http-server --name "voxly-frontend" -- "$DEPLOY_TARGET_FRONTEND" -p 8080
             
             # =========================================================
-            # ЧАСТЬ 2: Развертывание БЭКЕНДА (Обновление из главного репо)
+            # ЧАСТЬ 2: Развертывание БЭКЕНДА (Установка зависимостей и перезапуск)
             # =========================================================
             
-            BACKEND_TARGET_DIR="/root/voxly-backend" # Целевая папка на VPS
-            
-            echo "Развертывание БЭКЕНДА в $BACKEND_TARGET_DIR..."
+            BACKEND_TARGET_DIR="/root/voxly-backend"
+            echo "Завершение развертывания БЭКЕНДА в $BACKEND_TARGET_DIR..."
 
-            # Проверка наличия git
-            if ! command -v git &> /dev/null; then
-              echo "ОШИБКА: Команда 'git' не найдена на VPS. Пожалуйста, установите git."
-              exit 1 # Завершаемся, если git не установлен
-            fi
+            # 8. Переходим в папку
+            cd "$BACKEND_TARGET_DIR" || { echo "ОШИБКА: Не удалось перейти в $BACKEND_TARGET_DIR. Проверьте права доступа."; exit 1; }
 
-            REPO_URL="https://github.com/${{ github.repository }}.git"
-            
-            # 8. Создаем целевую папку и переходим в нее
-            mkdir -p "$BACKEND_TARGET_DIR"
-            cd "$BACKEND_TARGET_DIR" || { echo "ОШИБКА: Не удалось перейти в $BACKEND_TARGET_DIR. Проверьте права."; exit 1; }
-
-            # 9. Инициализация/Настройка Git
-            if [ ! -d ".git" ]; then
-              # Если это первое развертывание (или в папке нет .git):
-              echo "Инициализация Git репозитория..."
-              git init --initial-branch=main || { echo "ОШИБКА: Не удалось инициализировать git."; exit 1; }
-              git remote add origin "$REPO_URL" || { echo "ОШИБКА: Не удалось добавить remote origin."; exit 1; }
-            fi
-            
-            # 10. Обновление: принудительно получаем файлы и сбрасываем локальные изменения
-            echo "Обновление файлов бэкенда через Git Pull..."
-            
-            # 10.1. Получаем свежие данные с сервера
-            git fetch origin main || { echo "ОШИБКА: Не удалось выполнить git fetch."; exit 1; }
-            
-            # 10.2. Сбрасываем изменения (включая удаление файлов, которых больше нет)
-            # Эта команда гарантирует, что локальная папка полностью совпадает с веткой main
-            git reset --hard origin/main || { echo "ОШИБКА: Не удалось выполнить git reset."; exit 1; }
-
-            # 11. Установка зависимостей Node.js (происходит внутри $BACKEND_TARGET_DIR)
+            # 9. Установка зависимостей Node.js 
             echo "Установка зависимостей Node.js..."
-            npm install || { echo "ОШИБКА: Не удалось выполнить npm install."; exit 1; }
+            # Используем --production для установки только зависимостей для продакшена (если есть)
+            npm install --omit=dev || { echo "ОШИБКА: Не удалось выполнить npm install."; exit 1; }
             
-            # 12. Перезапускаем PM2-процесс бэкенда
+            # 10. Перезапускаем PM2-процесс бэкенда
             echo "Перезапуск voxly-backend..."
             pm2 reload voxly-backend || { echo "ОШИБКА: Не удалось перезапустить PM2 процесс 'voxly-backend'."; }
             
-            # 13. Сохраняем состояние PM2
+            # 11. Сохраняем состояние PM2
             echo "Сохранение состояния PM2..."
             pm2 save

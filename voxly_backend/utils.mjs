@@ -13,6 +13,9 @@ export function generateRoomName() {
 }
 
 export async function createToken(roomName, userName) {
+  console.log(LIVEKIT_API_KEY);
+  console.log(LIVEKIT_API_SECRET);
+
   const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
     identity: userName,
     ttl: "60m",

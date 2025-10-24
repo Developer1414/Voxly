@@ -30,7 +30,7 @@ async function handleGenerateHint(req, res) {
     const data = await aiResponse.json();
 
     if (aiResponse.ok) {
-      const hint = data.choices[0].message.content.toString().trim();
+      const hint = data.message?.content?.trim() || "";
       res.json({ hint });
     } else {
       console.error("Ошибка API OpenRouter:", data);

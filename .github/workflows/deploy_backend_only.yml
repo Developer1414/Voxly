@@ -28,12 +28,11 @@ jobs:
           script: |
             BACKEND_TARGET_DIR="/root/voxly-backend"
             echo "Очистка содержимого папки $BACKEND_TARGET_DIR перед копированием..."
-            # Удаляем все внутри папки, включая скрытые файлы (кроме .env, если он не в репозитории)
+            # Удаляем все внутри папки, включая скрытые файлы
             rm -rf "$BACKEND_TARGET_DIR"/*
             rm -rf "$BACKEND_TARGET_DIR"/.* || true
 
       # --- ШАГ 3. КОПИРОВАНИЕ ФАЙЛОВ НА VPS через SCP ---
-      # Копируется ./voxly_backend в /root/voxly-backend, создавая вложенную папку.
       - name: 3. Копирование файлов БЭКЕНДА на VPS (/root/voxly-backend)
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -59,11 +58,8 @@ jobs:
             
             # 1. Перемещение содержимого из вложенной папки на уровень выше
             echo "Перемещение файлов из вложенной папки..."
-            # Копируем содержимое voxly_backend/* в текущую папку
             mv "$BACKEND_TARGET_DIR/voxly_backend/"* "$BACKEND_TARGET_DIR"
-            # Перемещаем скрытые файлы (например, .gitignore)
             mv "$BACKEND_TARGET_DIR/voxly_backend/".* "$BACKEND_TARGET_DIR" || true
-            # Удаляем теперь пустую вложенную папку
             rm -rf "$BACKEND_TARGET_DIR/voxly_backend"
 
             # 2. Переходим в целевую папку
@@ -73,7 +69,7 @@ jobs:
             echo "Установка зависимостей Node.js..."
             npm install
             
-            # 4. Формирование аргументов ENV (обязательно в одну строку)
+            # 4. Формирование аргументов ENV (нужны для переопределения/добавления Secrets)
             ENV_ARGS="--env PORT=${{ secrets.PORT }} \
               --env REDIS_URL=${{ secrets.REDIS_URL }} \
               --env OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }} \
@@ -81,10 +77,16 @@ jobs:
               --env LIVEKIT_API_KEY=${{ secrets.LIVEKIT_API_KEY }} \
               --env LIVEKIT_API_SECRET=${{ secrets.LIVEKIT_API_SECRET }}"
               
-            # 5. ПЕРЕЗАПУСК PM2 (ИСПРАВЛЕНО): 
-            # 'pm2 start' с --force и --update-env гарантирует обновление ENV и перезапуск
-            echo "Перезапуск 'server' с обновлением ENV..."
-            pm2 start server.mjs --name server --update-env --force $ENV_ARGS || { echo "ОШИБКА: Не удалось запустить/перезапустить PM2 процесс 'server'."; exit 1; }
+            # 5. ИСПРАВЛЕНО: Гарантируем отсутствие дубликатов с помощью pm2 delete
+            
+            echo "Удаление старого процесса 'server' (если он существует)..."
+            # Удаляем процесс по имени (предполагаем, что имя в config.js - 'server'). 
+            # '|| true' предотвращает сбой, если процесса нет.
+            pm2 delete server || true
+
+            echo "Запуск нового процесса с использованием ecosystem.config.js и Secrets..."
+            # Запускаем, используя config file, и передаем внешние ENV-переменные.
+            pm2 start "$BACKEND_TARGET_DIR/ecosystem.config.js" $ENV_ARGS || { echo "ОШИБКА: Не удалось запустить PM2 процесс с конфигом."; exit 1; }
             
             # 6. Сохранение состояния PM2
             echo "Сохранение состояния PM2..."

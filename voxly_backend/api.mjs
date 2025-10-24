@@ -1,10 +1,8 @@
 import express from "express";
 
-import dotenv from "dotenv";
+import { OLLAMA_API_KEY } from "./config.mjs";
 
 const apiRouter = express.Router();
-
-dotenv.config();
 
 async function handleGenerateHint(req, res) {
   const { prompt } = req.body;
@@ -17,13 +15,11 @@ async function handleGenerateHint(req, res) {
   const model = "gpt-oss:20b";
   const openRouterUrl = "https://ollama.com/api/chat";
 
-  console.log("KEY: " + process.env.OLLAMA_API_KEY);
-
   try {
     const aiResponse = await fetch(openRouterUrl, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.OLLAMA_API_KEY}`,
+        Authorization: `Bearer ${OLLAMA_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

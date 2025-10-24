@@ -12,7 +12,7 @@ async function handleGenerateHint(req, res) {
       .json({ error: "Отсутствует текст подсказки (prompt) в теле запроса." });
   }
 
-  const model = "gpt-oss:20b";
+  const model = "qwen3-vl:235b";
   const openRouterUrl = "https://ollama.com/api/chat";
 
   try {

@@ -126,12 +126,12 @@ class LobbyPage extends StatelessWidget {
         ),
         Expanded(child: Container()),
         AnimatedContainer(
+          width: 550.0,
           curve: Curves.easeInOutBack,
           duration: const Duration(milliseconds: 200),
           child: Stack(
             children: [
               Container(
-                width: 450.0,
                 padding: AppSpacing.allM,
                 margin: const EdgeInsets.only(
                   left: AppSpacing.l,
@@ -142,57 +142,62 @@ class LobbyPage extends StatelessWidget {
                   borderRadius: BorderRadius.circular(25.0),
                   color: const Color.fromARGB(255, 91, 65, 26),
                 ),
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 150),
-                  transitionBuilder:
-                      (Widget child, Animation<double> animation) {
-                        return FadeTransition(opacity: animation, child: child);
-                      },
-                  child: livekitProvider.isGeneratingStartQuestion
-                      ? Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          spacing: AppSpacing.m,
-                          children: [
-                            const SizedBox(
-                              width: 30.0,
-                              height: 30.0,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeCap: StrokeCap.round,
-                                strokeWidth: 5.5,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 150),
+                    transitionBuilder:
+                        (Widget child, Animation<double> animation) {
+                          return FadeTransition(
+                            opacity: animation,
+                            child: child,
+                          );
+                        },
+                    child: livekitProvider.isGeneratingStartQuestion
+                        ? Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            spacing: AppSpacing.m,
+                            children: [
+                              const SizedBox(
+                                width: 30.0,
+                                height: 30.0,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeCap: StrokeCap.round,
+                                  strokeWidth: 5.5,
+                                ),
                               ),
-                            ),
-                            Text(
-                              'Генерация ИИ подсказки...',
-                              style: AppTextStyles.h3Theme.copyWith(),
-                            ),
-                          ],
-                        )
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          spacing: AppSpacing.xxs,
-                          children: [
-                            if (livekitProvider.aiHint.isSuccessfully) ...[
                               Text(
-                                'Начните разговор с вопроса:',
-                                style: AppTextStyles.h3Theme.copyWith(
-                                  fontSize: 15.0,
-                                  color: Colors.white70,
+                                'Генерация ИИ подсказки...',
+                                style: AppTextStyles.h3Theme.copyWith(),
+                              ),
+                            ],
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            spacing: AppSpacing.xxs,
+                            children: [
+                              if (livekitProvider.aiHint.isSuccessfully) ...[
+                                Text(
+                                  'Начните разговор с вопроса:',
+                                  style: AppTextStyles.h3Theme.copyWith(
+                                    fontSize: 15.0,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ],
+                              Text(
+                                livekitProvider.aiHint.hint,
+                                style: AppTextStyles.h2Theme.copyWith(
+                                  fontSize: 18.0,
                                 ),
                               ),
                             ],
-                            Text(
-                              livekitProvider.aiHint.hint,
-                              style: AppTextStyles.h2Theme.copyWith(
-                                fontSize: 18.0,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                  ),
                 ),
               ),
-              if (!livekitProvider.aiHint.isSuccessfully &&
-                  !livekitProvider.isGeneratingStartQuestion) ...[
+              if (!livekitProvider.isGeneratingStartQuestion) ...[
                 Transform.translate(
                   offset: Offset(-10.0, -20.0),
                   child: Align(

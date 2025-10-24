@@ -27,7 +27,7 @@ export async function createToken(roomName, userName) {
     canSubscribe: true,
   });
 
-  const token = at.toJwt();
+  const token = await at.toJwt();
 
   if (typeof token !== "string" || token.length === 0) {
     console.error(

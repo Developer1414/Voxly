@@ -13,6 +13,8 @@ async function handleGenerateHint(req, res) {
   const model = "gpt-oss:20b";
   const openRouterUrl = "https://ollama.com/api/chat";
 
+  console.log("KEY: " + process.env.OLLAMA_API_KEY);
+
   try {
     const aiResponse = await fetch(openRouterUrl, {
       method: "POST",

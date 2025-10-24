@@ -1,5 +1,4 @@
 import express from "express";
-import { OPENROUTER_API_KEY } from "./config.mjs";
 
 const apiRouter = express.Router();
 
@@ -11,19 +10,20 @@ async function handleGenerateHint(req, res) {
       .json({ error: "Отсутствует текст подсказки (prompt) в теле запроса." });
   }
 
-  const model = "meituan/longcat-flash-chat:free";
-  const openRouterUrl = "https://openrouter.ai/api/v1/chat/completions";
+  const model = "gpt-oss:20b";
+  const openRouterUrl = "https://ollama.com/api/chat";
 
   try {
     const aiResponse = await fetch(openRouterUrl, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        Authorization: `Bearer ${process.env.OLLAMA_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model: model,
         messages: [{ role: "user", content: prompt }],
+        stream: false,
       }),
     });
 

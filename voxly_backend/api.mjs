@@ -1,6 +1,10 @@
 import express from "express";
 
+import dotenv from "dotenv";
+
 const apiRouter = express.Router();
+
+dotenv.config();
 
 async function handleGenerateHint(req, res) {
   const { prompt } = req.body;

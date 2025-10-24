@@ -28,20 +28,19 @@ jobs:
           script: |
             BACKEND_TARGET_DIR="/root/voxly-backend"
             echo "Очистка содержимого папки $BACKEND_TARGET_DIR перед копированием..."
-            # Удаляем все внутри папки, но оставляем саму папку
+            # Удаляем все внутри папки, включая скрытые файлы (кроме .env, если он не в репозитории)
             rm -rf "$BACKEND_TARGET_DIR"/*
             rm -rf "$BACKEND_TARGET_DIR"/.* || true
 
       # --- ШАГ 3. КОПИРОВАНИЕ ФАЙЛОВ НА VPS через SCP ---
-      # ИЗМЕНЕНО: Копируем всю папку voxly_backend, а не ее содержимое.
-      # На VPS это создаст структуру: /root/voxly-backend/voxly_backend/...
+      # Копируется ./voxly_backend в /root/voxly-backend, создавая вложенную папку.
       - name: 3. Копирование файлов БЭКЕНДА на VPS (/root/voxly-backend)
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "./voxly_backend" # ИЗМЕНЕНО: Убрана маска /*
+          source: "./voxly_backend"
           target: "/root/voxly-backend"
           overwrite: true
           
@@ -58,26 +57,23 @@ jobs:
             
             echo "Развертывание БЭКЕНДА в $BACKEND_TARGET_DIR..."
             
-            # НОВЫЕ КОМАНДЫ: Перемещаем содержимое из вложенной папки на уровень выше
+            # 1. Перемещение содержимого из вложенной папки на уровень выше
             echo "Перемещение файлов из вложенной папки..."
             # Копируем содержимое voxly_backend/* в текущую папку
             mv "$BACKEND_TARGET_DIR/voxly_backend/"* "$BACKEND_TARGET_DIR"
-            # Перемещаем скрытые файлы (например, .env)
+            # Перемещаем скрытые файлы (например, .gitignore)
             mv "$BACKEND_TARGET_DIR/voxly_backend/".* "$BACKEND_TARGET_DIR" || true
             # Удаляем теперь пустую вложенную папку
             rm -rf "$BACKEND_TARGET_DIR/voxly_backend"
 
-
-            echo "Аварийная очистка вложенных папок..."
-            rm -rf "$BACKEND_TARGET_DIR/voxly_frontend"
-            
+            # 2. Переходим в целевую папку
             cd "$BACKEND_TARGET_DIR" || { echo "ОШИБКА: Не удалось перейти в $BACKEND_TARGET_DIR. Проверьте путь и права."; exit 1; }
 
+            # 3. Установка зависимостей Node.js
             echo "Установка зависимостей Node.js..."
             npm install
             
-            echo "Перезапуск voxly-backend с ENV..."
-            
+            # 4. Формирование аргументов ENV (обязательно в одну строку)
             ENV_ARGS="--env PORT=${{ secrets.PORT }} \
               --env REDIS_URL=${{ secrets.REDIS_URL }} \
               --env OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }} \
@@ -85,7 +81,11 @@ jobs:
               --env LIVEKIT_API_KEY=${{ secrets.LIVEKIT_API_KEY }} \
               --env LIVEKIT_API_SECRET=${{ secrets.LIVEKIT_API_SECRET }}"
               
-            pm2 reload voxly-backend --interpreter node -- start server.mjs $ENV_ARGS || { echo "ОШИБКА: Не удалось перезапустить PM2 процесс 'voxly-backend'."; }
+            # 5. ПЕРЕЗАПУСК PM2 (ИСПРАВЛЕНО): 
+            # 'pm2 start' с --force и --update-env гарантирует обновление ENV и перезапуск
+            echo "Перезапуск 'server' с обновлением ENV..."
+            pm2 start server.mjs --name server --update-env --force $ENV_ARGS || { echo "ОШИБКА: Не удалось запустить/перезапустить PM2 процесс 'server'."; exit 1; }
             
+            # 6. Сохранение состояния PM2
             echo "Сохранение состояния PM2..."
             pm2 save

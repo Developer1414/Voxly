@@ -9,6 +9,7 @@ import {
   USER_ROOM_PREFIX,
 } from "./utils.mjs";
 import { LIVEKIT_URL } from "./config.mjs";
+import { handleMessages } from "./chatRoom.mjs"
 
 async function handleFindMatch(socket, data, io) {
   try {
@@ -38,6 +39,7 @@ async function handleFindMatch(socket, data, io) {
       }
 
       const roomName = generateRoomName();
+
       console.log(
         `Создана комната ${roomName} для ${userName} и ${partnerUserName}`
       );
@@ -58,12 +60,16 @@ async function handleFindMatch(socket, data, io) {
         token: token1,
         partner: partnerUserName,
       });
+
       io.to(partnerSocketId).emit("match", {
         roomName,
         liveKitUrl: LIVEKIT_URL,
         token: token2,
         partner: userName,
       });
+
+      socket.join(roomName);
+      io.sockets.sockets.get(partnerSocketId)?.join(roomName);
     }
   } catch (error) {
     console.error('Ошибка в обработчике "find":', error);
@@ -90,5 +96,13 @@ export function setupSocketListeners(socket, io) {
   socket.on("disconnect", async () => {
     console.log(`Пользователь отключен: ${socket.id}`);
     await cleanupUserSession(socket.id, io);
+  });
+
+  socket.on("message", async (message) => {
+    const roomName = await redisClient.get(`${USER_ROOM_PREFIX}${socket.id}`);
+
+    if (!roomName) return;
+
+    handleMessages(socket, roomName, message, io);
   });
 }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:livekit_client/livekit_client.dart';
@@ -38,6 +39,8 @@ class LivekitService extends ChangeNotifier {
   Timer? _sessionTimer;
 
   bool isGeneratingStartQuestion = true;
+
+  List<String> roomMessages = [];
 
   void _setState(CallState newState, {String? error}) {
     if (_state == newState && error == null) return;
@@ -138,6 +141,25 @@ class LivekitService extends ChangeNotifier {
       await _cleanUpCall(notify: true);
       _setState(CallState.connected, error: 'Собеседник завершил звонок.');
     });
+
+    socket.on('update_messages', (data) async {
+      roomMessages.clear();
+
+      for (var item in data) {
+        final msg = item["message"];
+        final userId = item["userId"];
+
+        final prefix = socket.id == userId ? 'Вы:' : 'Собес.:';
+
+        roomMessages.add('$prefix $msg');
+      }
+
+      notifyListeners();
+    });
+  }
+
+  void sendMessage(String text) {
+    socket.emit('message', text);
   }
 
   void findMatch() {

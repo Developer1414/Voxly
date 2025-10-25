@@ -4,9 +4,12 @@ import 'package:voxly_frontend/core/services/livekit_service.dart';
 import 'package:voxly_frontend/core/themes/app_text_style.dart';
 import 'package:voxly_frontend/core/widgets/button_widget.dart';
 import 'package:voxly_frontend/core/themes/app_spacing.dart';
+import 'package:voxly_frontend/core/widgets/text_field_widget.dart';
 
 class LobbyPage extends StatelessWidget {
   const LobbyPage({super.key});
+
+  static TextEditingController messageController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -125,95 +128,139 @@ class LobbyPage extends StatelessWidget {
           ],
         ),
         Expanded(child: Container()),
-        AnimatedContainer(
-          width: 550.0,
-          curve: Curves.easeInOutBack,
-          duration: const Duration(milliseconds: 200),
-          child: Stack(
+
+        Container(
+          height: 500.0,
+          padding: AppSpacing.allM,
+          margin: const EdgeInsets.only(
+            left: AppSpacing.l,
+            right: AppSpacing.l,
+            bottom: AppSpacing.l,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(25.0),
+            color: const Color.fromARGB(255, 91, 65, 26),
+          ),
+          child: Column(
+            spacing: AppSpacing.s,
             children: [
-              Container(
-                padding: AppSpacing.allM,
-                margin: const EdgeInsets.only(
-                  left: AppSpacing.l,
-                  right: AppSpacing.l,
-                  bottom: AppSpacing.l,
-                ),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(25.0),
-                  color: const Color.fromARGB(255, 91, 65, 26),
-                ),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 150),
-                    transitionBuilder:
-                        (Widget child, Animation<double> animation) {
-                          return FadeTransition(
-                            opacity: animation,
-                            child: child,
-                          );
-                        },
-                    child: livekitProvider.isGeneratingStartQuestion
-                        ? Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            spacing: AppSpacing.m,
-                            children: [
-                              const SizedBox(
-                                width: 30.0,
-                                height: 30.0,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeCap: StrokeCap.round,
-                                  strokeWidth: 5.5,
-                                ),
-                              ),
-                              Text(
-                                'Генерация ИИ подсказки...',
-                                style: AppTextStyles.h3Theme.copyWith(),
-                              ),
-                            ],
-                          )
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            spacing: AppSpacing.xxs,
-                            children: [
-                              if (livekitProvider.aiHint.isSuccessfully) ...[
-                                Text(
-                                  'Начните разговор с вопроса:',
-                                  style: AppTextStyles.h3Theme.copyWith(
-                                    fontSize: 15.0,
-                                    color: Colors.white70,
-                                  ),
-                                ),
-                              ],
-                              Text(
-                                livekitProvider.aiHint.hint,
-                                style: AppTextStyles.h2Theme.copyWith(
-                                  fontSize: 18.0,
-                                ),
-                              ),
-                            ],
-                          ),
-                  ),
+              Expanded(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  reverse: true,
+                  itemBuilder: (context, index) {
+                    final roomMessages = livekitProvider.roomMessages.reversed
+                        .toList();
+
+                    return SelectableText(
+                      roomMessages[index],
+                      style: AppTextStyles.h3Theme.copyWith(
+                        fontSize: 18.0,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    );
+                  },
+                  separatorBuilder: (context, index) => SizedBox(height: 10.0),
+                  itemCount: livekitProvider.roomMessages.length,
                 ),
               ),
-              if (!livekitProvider.isGeneratingStartQuestion) ...[
-                Transform.translate(
-                  offset: Offset(-10.0, -20.0),
-                  child: Align(
-                    alignment: Alignment.topRight,
-                    child: ButtonWidget(
-                      onTap: () async =>
-                          await livekitProvider.setStartQuestion(),
-                      padding: EdgeInsets.all(12.0),
-                      child: Icon(Icons.replay_rounded, size: 28.0),
-                    ),
-                  ),
-                ),
-              ],
+              textField(
+                controller: messageController,
+                onSubmitted: (text) => livekitProvider.sendMessage(text),
+              ),
             ],
           ),
         ),
+
+        // AnimatedContainer(
+        //   width: 550.0,
+        //   curve: Curves.easeInOutBack,
+        //   duration: const Duration(milliseconds: 200),
+        //   child: Stack(
+        //     children: [
+        //       Container(
+        //         padding: AppSpacing.allM,
+        //         margin: const EdgeInsets.only(
+        //           left: AppSpacing.l,
+        //           right: AppSpacing.l,
+        //           bottom: AppSpacing.l,
+        //         ),
+        //         decoration: BoxDecoration(
+        //           borderRadius: BorderRadius.circular(25.0),
+        //           color: const Color.fromARGB(255, 91, 65, 26),
+        //         ),
+        //         child: Align(
+        //           alignment: Alignment.centerLeft,
+        //           child: AnimatedSwitcher(
+        //             duration: const Duration(milliseconds: 150),
+        //             transitionBuilder:
+        //                 (Widget child, Animation<double> animation) {
+        //                   return FadeTransition(
+        //                     opacity: animation,
+        //                     child: child,
+        //                   );
+        //                 },
+        //             child: livekitProvider.isGeneratingStartQuestion
+        //                 ? Row(
+        //                     mainAxisAlignment: MainAxisAlignment.center,
+        //                     spacing: AppSpacing.m,
+        //                     children: [
+        //                       const SizedBox(
+        //                         width: 30.0,
+        //                         height: 30.0,
+        //                         child: CircularProgressIndicator(
+        //                           color: Colors.white,
+        //                           strokeCap: StrokeCap.round,
+        //                           strokeWidth: 5.5,
+        //                         ),
+        //                       ),
+        //                       Text(
+        //                         'Генерация ИИ подсказки...',
+        //                         style: AppTextStyles.h3Theme.copyWith(),
+        //                       ),
+        //                     ],
+        //                   )
+        //                 : Column(
+        //                     crossAxisAlignment: CrossAxisAlignment.start,
+        //                     spacing: AppSpacing.xxs,
+        //                     children: [
+        //                       if (livekitProvider.aiHint.isSuccessfully) ...[
+        //                         Text(
+        //                           'Начните разговор с вопроса:',
+        //                           style: AppTextStyles.h3Theme.copyWith(
+        //                             fontSize: 15.0,
+        //                             color: Colors.white70,
+        //                           ),
+        //                         ),
+        //                       ],
+        //                       Text(
+        //                         livekitProvider.aiHint.hint,
+        //                         style: AppTextStyles.h2Theme.copyWith(
+        //                           fontSize: 18.0,
+        //                         ),
+        //                       ),
+        //                     ],
+        //                   ),
+        //           ),
+        //         ),
+        //       ),
+        //       if (!livekitProvider.isGeneratingStartQuestion) ...[
+        //         Transform.translate(
+        //           offset: Offset(-10.0, -20.0),
+        //           child: Align(
+        //             alignment: Alignment.topRight,
+        //             child: ButtonWidget(
+        //               onTap: () async =>
+        //                   await livekitProvider.setStartQuestion(),
+        //               padding: EdgeInsets.all(12.0),
+        //               child: Icon(Icons.replay_rounded, size: 28.0),
+        //             ),
+        //           ),
+        //         ),
+        //       ],
+        //     ],
+        //   ),
+        // ),
       ],
     );
   }

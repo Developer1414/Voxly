@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:telegram_web_app/telegram_web_app.dart';
+import 'package:voxly_frontend/core/extensions/tg_fake_extension.dart';
 
 class TelegramService {
   TelegramService._();
@@ -24,7 +25,7 @@ class TelegramService {
         );
 
         initData = kDebugMode
-            ? TelegramWebAppFake().initData
+            ? TelegramWebAppFake().initData.withRandomUsername()
             : TelegramWebApp.instance.initData;
 
         TelegramWebApp.instance.enableClosingConfirmation();
